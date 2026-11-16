@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Build artifacts
+build/
+dist/
+
+# Local saves, records and logs
+neon_snake_save.json
+neon_snake_best.json
+neon_snake_error.log
+
+# OS
+Thumbs.db
+Desktop.ini
