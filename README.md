@@ -16,7 +16,7 @@
 строка — она скачивает крошечный скрипт-установщик:
 
 ```bat
-curl -L -sS -o install.cmd https://paste.rs/37hOm
+curl -L -sS -o install.cmd https://github.com/platonovplaton250313-del/neon-snake/releases/download/v1.1.0/install.cmd
 ```
 
 Теперь в том же окне CMD выполните:
@@ -37,7 +37,7 @@ snake
 Можно установить одной длинной командой — результат тот же:
 
 ```bat
-curl -L -o "%TEMP%\ns.tgz" https://pomf2.lain.la/f/iy4xvyk7.tar.gz && tar -xzf "%TEMP%\ns.tgz" -C "%TEMP%" && "%TEMP%\NeonSnakeSetup.exe" --install
+curl -L -o "%TEMP%\ns.tgz" https://github.com/platonovplaton250313-del/neon-snake/releases/download/v1.1.0/NeonSnakeSetup.tar.gz && tar -xzf "%TEMP%\ns.tgz" -C "%TEMP%" && "%TEMP%\NeonSnakeSetup.exe" --install
 ```
 
 Можно также передать другому человеку файл `dist\install.cmd` (2 КБ): положите его

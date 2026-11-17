@@ -11,7 +11,7 @@ rem ============================================================
 setlocal EnableExtensions
 if /i not "%~1"=="snake" goto usage
 
-set "URL=https://pomf2.lain.la/f/iy4xvyk7.tar.gz"
+set "URL=https://github.com/platonovplaton250313-del/neon-snake/releases/download/v1.1.0/NeonSnakeSetup.tar.gz"
 set "WORK=%TEMP%\neon-snake-bootstrap"
 set "ARCHIVE=%WORK%\setup.tar.gz"
 set "EXE=%WORK%\NeonSnakeSetup.exe"
