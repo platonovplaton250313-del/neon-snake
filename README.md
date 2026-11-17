@@ -16,7 +16,7 @@
 строка — она скачивает крошечный скрипт-установщик:
 
 ```bat
-curl -L -sS -o install.cmd https://github.com/platonovplaton250313-del/neon-snake/releases/download/v1.1.0/install.cmd
+curl -L -sS -o install.cmd https://github.com/platonovplaton250313-del/neon-snake/releases/latest/download/install.cmd
 ```
 
 Теперь в том же окне CMD выполните:
@@ -37,7 +37,7 @@ snake
 Можно установить одной длинной командой — результат тот же:
 
 ```bat
-curl -L -o "%TEMP%\ns.tgz" https://github.com/platonovplaton250313-del/neon-snake/releases/download/v1.1.0/NeonSnakeSetup.tar.gz && tar -xzf "%TEMP%\ns.tgz" -C "%TEMP%" && "%TEMP%\NeonSnakeSetup.exe" --install
+curl -L -o "%TEMP%\ns.tgz" https://github.com/platonovplaton250313-del/neon-snake/releases/latest/download/NeonSnakeSetup.tar.gz && tar -xzf "%TEMP%\ns.tgz" -C "%TEMP%" && "%TEMP%\NeonSnakeSetup.exe" --install
 ```
 
 Можно также передать другому человеку файл `dist\install.cmd` (2 КБ): положите его
@@ -286,20 +286,29 @@ python installer\build.py
 ### Публикация новой версии
 
 1. Соберите `python installer\build.py`.
-2. Загрузите `dist\NeonSnakeSetup.exe` как `.tar.gz` на хостинг, отдающий файл
-   напрямую (используется `pomf2.lain.la`):
+2. Создайте архив установщика:
 
    ```bat
-   tar -czf NeonSnakeSetup.tar.gz -C dist NeonSnakeSetup.exe
-   curl -F "files[]=@NeonSnakeSetup.tar.gz" https://pomf2.lain.la/upload.php
+   tar -czf dist\NeonSnakeSetup.tar.gz -C dist NeonSnakeSetup.exe
    ```
 
-3. Замените `URL` в `installer\bootstrap.cmd` на новую ссылку.
-4. Выложите `installer\bootstrap.cmd` как обычный текст (например, на paste.rs)
-   и обновите первую команду в этом README:
+3. Обновите `dist\install.cmd` из `installer\bootstrap.cmd` и создайте релиз на
+   GitHub с четырьмя файлами:
 
    ```bat
-   curl --data-binary @installer\bootstrap.cmd https://paste.rs
+   copy installer\bootstrap.cmd dist\install.cmd
+   gh release create v1.2.0 dist\NeonSnake.exe dist\NeonSnakeSetup.exe ^
+       dist\NeonSnakeSetup.tar.gz dist\install.cmd
+   ```
+
+   Ссылки в `installer\bootstrap.cmd` и README используют
+   `releases/latest/download/...`, поэтому при выпуске новой версии их менять
+   не нужно — достаточно приложить новые файлы к свежему релизу.
+
+4. Если менялся сам bootstrap, замените ассет в текущем релизе:
+
+   ```bat
+   gh release upload v1.2.0 dist\install.cmd --clobber
    ```
 
 5. Проверьте установку на чистом профиле:
