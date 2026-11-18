@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>NEON SNAKE — неоновая змейка</title>
+<meta name="description" content="NEON SNAKE — неоновая змейка для телефона: классика, лабиринт, блиц, хаос, боты и игра по сети. Работает офлайн.">
+<meta name="theme-color" content="#04070f">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NEON SNAKE">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="bgfx" aria-hidden="true">
+  <span class="orb orb-a"></span>
+  <span class="orb orb-b"></span>
+  <span class="orb orb-c"></span>
+  <span class="scan"></span>
+</div>
+
+<div id="app">
+
+  <!-- ГЛАВНОЕ МЕНЮ -->
+  <section class="screen screen-menu" data-screen="menu">
+    <div class="menu-top">
+      <p class="eyebrow">НЕОНОВАЯ АРКАДА</p>
+      <h1 class="brand"><span>NEON</span><span>SNAKE</span></h1>
+      <p class="tagline">Шесть режимов. Одна змея.<br>Бесконечный неон.</p>
+    </div>
+
+    <div class="menu-actions">
+      <button class="btn btn-primary" data-action="play">
+        <span class="btn-glow"></span>ИГРАТЬ
+      </button>
+      <button class="btn" data-action="settings">НАСТРОЙКИ</button>
+      <button class="btn btn-ghost" data-action="howto">КАК ИГРАТЬ</button>
+    </div>
+
+    <div class="menu-stats">
+      <div class="stat">
+        <span class="stat-label">РЕКОРД</span>
+        <b class="stat-value" data-best="classic">0</b>
+        <span class="stat-sub">КЛАССИКА</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">РЕЖИМОВ</span>
+        <b class="stat-value">6</b>
+        <span class="stat-sub">ВКЛЮЧАЯ СЕТЬ</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">СЕТЬ</span>
+        <b class="stat-value stat-value-sm">P2P</b>
+        <span class="stat-sub">ANDROID · IPHONE</span>
+      </div>
+    </div>
+
+    <div class="menu-bottom">
+      <button id="install-btn" class="install-btn hidden">УСТАНОВИТЬ НА ТЕЛЕФОН</button>
+      <p class="menu-note">Работает офлайн · без рекламы</p>
+    </div>
+  </section>
+
+  <!-- ВЫБОР РЕЖИМА -->
+  <section class="screen screen-modes" data-screen="modes">
+    <header class="screen-head">
+      <button class="icon-btn" data-action="menu" aria-label="В меню">←</button>
+      <h2>РЕЖИМ</h2>
+      <span class="head-spacer"></span>
+    </header>
+
+    <div class="mode-list">
+      <button class="mode-card" data-mode="classic" style="--accent:#7ef9ff;--accent2:#3fd0ff">
+        <span class="mode-badge">◆</span>
+        <span class="mode-body">
+          <span class="mode-name">КЛАССИКА</span>
+          <span class="mode-desc">Яблоки, комбо и тонны адреналина.</span>
+        </span>
+        <span class="mode-best"><small>РЕКОРД</small><b data-best="classic">0</b></span>
+      </button>
+
+      <button class="mode-card" data-mode="maze" style="--accent:#b06bff;--accent2:#7a4dff">
+        <span class="mode-badge">▦</span>
+        <span class="mode-body">
+          <span class="mode-name">ЛАБИРИНТ</span>
+          <span class="mode-desc">Неоновые стены — ищи обход.</span>
+        </span>
+        <span class="mode-best"><small>РЕКОРД</small><b data-best="maze">0</b></span>
+      </button>
+
+      <button class="mode-card" data-mode="blitz" style="--accent:#ffd24a;--accent2:#ff9a4d">
+        <span class="mode-badge">60</span>
+        <span class="mode-body">
+          <span class="mode-name">БЛИЦ 60</span>
+          <span class="mode-desc">Одна минута на всё. Не тормози.</span>
+        </span>
+        <span class="mode-best"><small>РЕКОРД</small><b data-best="blitz">0</b></span>
+      </button>
+
+      <button class="mode-card" data-mode="chaos" style="--accent:#ff9a4d;--accent2:#ff4d9d">
+        <span class="mode-badge">☄</span>
+        <span class="mode-body">
+          <span class="mode-name">ХАОС</span>
+          <span class="mode-desc">Метеориты, турбо и бонусы без передышки.</span>
+        </span>
+        <span class="mode-best"><small>РЕКОРД</small><b data-best="chaos">0</b></span>
+      </button>
+
+      <button class="mode-card" data-mode="bots" style="--accent:#ff4d9d;--accent2:#ff9ad0">
+        <span class="mode-badge">AI</span>
+        <span class="mode-body">
+          <span class="mode-name">ПРОТИВ БОТОВ</span>
+          <span class="mode-desc">Две змеи-ИИ на одном поле.</span>
+        </span>
+        <span class="mode-best"><small>РЕКОРД</small><b data-best="bots">0</b></span>
+      </button>
+
+      <button class="mode-card mode-card-net" data-mode="net" style="--accent:#39ff88;--accent2:#7ef9ff">
+        <span class="mode-badge">⇄</span>
+        <span class="mode-body">
+          <span class="mode-name">СЕТЕВАЯ ИГРА</span>
+          <span class="mode-desc">Два игрока по коду комнаты.</span>
+        </span>
+        <span class="mode-best"><small>РЕКОРД</small><b data-best="net">0</b></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- НАСТРОЙКИ -->
+  <section class="screen screen-settings" data-screen="settings">
+    <header class="screen-head">
+      <button class="icon-btn" data-action="menu" aria-label="В меню">←</button>
+      <h2>НАСТРОЙКИ</h2>
+      <span class="head-spacer"></span>
+    </header>
+
+    <div class="settings-list">
+      <div class="setting-row" data-setting="speed">
+        <div class="setting-text"><span>СКОРОСТЬ</span><small>Темп движения змейки</small></div>
+        <div class="segment">
+          <button data-value="slow">МЕДЛ.</button>
+          <button data-value="normal">ОБЫЧНО</button>
+          <button data-value="fast">БЫСТРО</button>
+        </div>
+      </div>
+
+      <div class="setting-row" data-setting="wrap">
+        <div class="setting-text"><span>СТЕНЫ</span><small>Проходить сквозь край поля</small></div>
+        <button class="switch" role="switch" aria-checked="false"><span></span></button>
+      </div>
+
+      <div class="setting-row" data-setting="grid">
+        <div class="setting-text"><span>СЕТКА</span><small>Неоновая разметка поля</small></div>
+        <button class="switch" role="switch" aria-checked="true"><span></span></button>
+      </div>
+
+      <div class="setting-row" data-setting="particles">
+        <div class="setting-text"><span>ЧАСТИЦЫ</span><small>Искры, кольца и вспышки</small></div>
+        <button class="switch" role="switch" aria-checked="true"><span></span></button>
+      </div>
+
+      <div class="setting-row" data-setting="shake">
+        <div class="setting-text"><span>ТРЯСКА</span><small>Экран реагирует на события</small></div>
+        <button class="switch" role="switch" aria-checked="true"><span></span></button>
+      </div>
+
+      <div class="setting-row" data-setting="sound">
+        <div class="setting-text"><span>ЗВУК</span><small>Синтезированные эффекты</small></div>
+        <button class="switch" role="switch" aria-checked="false"><span></span></button>
+      </div>
+
+      <div class="setting-row" data-setting="specials">
+        <div class="setting-text"><span>ЗОЛОТАЯ ЗВЕЗДА</span><small>Как часто появляется</small></div>
+        <div class="segment">
+          <button data-value="rare">РЕДКО</button>
+          <button data-value="normal">ОБЫЧНО</button>
+          <button data-value="often">ЧАСТО</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-danger" id="reset-records">СБРОСИТЬ РЕКОРДЫ</button>
+    <p class="settings-note">Настройки сохраняются на этом устройстве.</p>
+  </section>
+
+  <!-- СЕТЕВАЯ ИГРА -->
+  <section class="screen screen-net" data-screen="net">
+    <header class="screen-head">
+      <button class="icon-btn" data-action="menu" aria-label="В меню">←</button>
+      <h2>СЕТЬ</h2>
+      <span class="head-spacer"></span>
+    </header>
+
+    <div class="net-tabs">
+      <button class="net-tab active" data-nettab="host">СОЗДАТЬ</button>
+      <button class="net-tab" data-nettab="join">ПОДКЛЮЧИТЬСЯ</button>
+    </div>
+
+    <div class="net-panel" id="net-host-panel">
+      <p class="net-lead">Создайте комнату и передайте код другу.<br>Он вводит код на своём телефоне.</p>
+      <div class="room-code" id="room-code">•••••</div>
+      <div class="net-status" id="host-status">Нажмите «Создать комнату»</div>
+      <div class="net-actions">
+        <button class="btn btn-primary" id="net-host-btn">СОЗДАТЬ КОМНАТУ</button>
+        <button class="btn" id="net-share" disabled>ПОДЕЛИТЬСЯ КОДОМ</button>
+        <button class="btn btn-ghost" data-action="net-cancel">ОТМЕНА</button>
+      </div>
+      <p class="net-note">Нужен интернет. Матч идёт через интернет-брокер сообщений.</p>
+    </div>
+
+    <div class="net-panel hidden" id="net-join-panel">
+      <p class="net-lead">Введите код комнаты, который показал хост.</p>
+      <label class="code-label" for="room-input">КОД КОМНАТЫ</label>
+      <input id="room-input" class="code-input" type="text" inputmode="text"
+             maxlength="5" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" placeholder="•••••">
+      <div class="net-status" id="join-status">Пять символов: буквы и цифры</div>
+      <div class="net-actions">
+        <button class="btn btn-primary" id="net-join-btn">ПОДКЛЮЧИТЬСЯ</button>
+        <button class="btn btn-ghost" data-action="net-cancel">ОТМЕНА</button>
+      </div>
+      <p class="net-note">С ПК-версией .exe сеть несовместима: там другой протокол.</p>
+    </div>
+  </section>
+
+  <!-- ИГРА -->
+  <section class="screen screen-game" data-screen="game">
+    <div class="hud">
+      <div class="hud-block hud-left">
+        <span class="hud-label">СЧЁТ</span>
+        <b class="hud-score" id="hud-score">0</b>
+        <span class="hud-best">РЕКОРД <b id="hud-best">0</b></span>
+      </div>
+      <div class="hud-block hud-center">
+        <span class="hud-mode" id="hud-mode">КЛАССИКА</span>
+        <span class="hud-timer hidden" id="hud-timer">1:00</span>
+        <span class="hud-sub" id="hud-sub">СОБИРАЙ ЯБЛОКИ</span>
+      </div>
+      <div class="hud-block hud-right">
+        <button class="icon-btn" id="pause-btn" aria-label="Пауза">Ⅱ</button>
+      </div>
+    </div>
+
+    <div class="rivals-bar hidden" id="rivals-bar"></div>
+
+    <div class="field-wrap" id="field-wrap">
+      <canvas id="game-canvas"></canvas>
+      <div class="fx-chips" id="fx-chips"></div>
+      <div class="countdown hidden" id="countdown">3</div>
+      <div class="swipe-hint" id="swipe-hint">СВАЙП ИЛИ СТРЕЛКИ</div>
+    </div>
+
+    <div class="touch-controls" id="touch-controls">
+      <div class="dpad">
+        <button class="dpad-btn up" data-dir="up" aria-label="Вверх">▲</button>
+        <button class="dpad-btn left" data-dir="left" aria-label="Влево">◀</button>
+        <span class="dpad-core"></span>
+        <button class="dpad-btn right" data-dir="right" aria-label="Вправо">▶</button>
+        <button class="dpad-btn down" data-dir="down" aria-label="Вниз">▼</button>
+      </div>
+      <div class="touch-side">
+        <span class="swipe-note">Свайп по полю<br>тоже работает</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- УНИВЕРСАЛЬНЫЙ ОВЕРЛЕЙ -->
+  <div class="overlay hidden" id="overlay" role="dialog" aria-modal="true">
+    <div class="overlay-card" id="overlay-card"></div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+</div>
+
+<script src="js/game.js"></script>
+</body>
+</html>
