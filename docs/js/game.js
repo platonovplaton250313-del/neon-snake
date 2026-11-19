@@ -23,6 +23,64 @@
   ];
   const MODE_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m]));
 
+  /* ---------------------------------------------------------------- магазин */
+  const SKINS = [
+    { id: 'classic', name: 'НЕОН', desc: 'Фирменный бирюзовый градиент', price: 0,
+      colors: ['#a8fbff', '#3fd0ff', '#9a6cff'] },
+    { id: 'magma', name: 'МАГМА', desc: 'Раскалённый закат', price: 600,
+      colors: ['#ffe0a8', '#ff8a3d', '#b51b4b'] },
+    { id: 'toxic', name: 'ТОКСИН', desc: 'Кислотный лайм', price: 800,
+      colors: ['#eaffb0', '#8dff4d', '#1fbf6b'] },
+    { id: 'ice', name: 'ЛЁД', desc: 'Ледяная сталь', price: 900,
+      colors: ['#ffffff', '#9fe8ff', '#4a7dff'] },
+    { id: 'royal', name: 'ЗОЛОТО', desc: 'Королевский металл', price: 1200,
+      colors: ['#fff4c2', '#ffd24a', '#b0720e'] },
+    { id: 'void', name: 'ПУСТОТА', desc: 'Фиолетовая бездна', price: 1500,
+      colors: ['#e3c8ff', '#b06bff', '#3d1a7a'] },
+    { id: 'pixel', name: 'ПИКСЕЛЬ', desc: 'Ретро-аркадный неон', price: 1800,
+      colors: ['#c8ff8a', '#39ff88', '#0e7a5a'] },
+    { id: 'rainbow', name: 'РАДУГА', desc: 'Переливается прямо в игре', price: 2500,
+      colors: ['#ff9ad0', '#ffd24a', '#39ff88'], special: 'rainbow' }
+  ];
+  const SKIN_BY_ID = Object.fromEntries(SKINS.map((s) => [s.id, s]));
+  const RAINBOW_PALETTES = [
+    ['#ff9ad0', '#ff4d9d', '#8f2a66'],
+    ['#ffe9a0', '#ffb347', '#7a4a16'],
+    ['#eaffb0', '#8dff4d', '#1fbf6b'],
+    ['#c8f7ff', '#3fd0ff', '#4a7dff'],
+    ['#e3c8ff', '#b06bff', '#5a2a9a'],
+    ['#ffd0dd', '#ff4d9d', '#b06bff']
+  ];
+
+  const CHEATS = [
+    { id: 'ghost', name: 'ФАНТОМ', chip: 'ФАНТОМ', icon: '◈', price: 2200,
+      desc: 'Проходить сквозь стены, метеориты и соперников. Своё тело всё ещё опасно.' },
+    { id: 'x2', name: 'ДВОЙНЫЕ ОЧКИ', chip: '×2', icon: '×2', price: 2600,
+      desc: 'Все очки удваиваются. Работает во всех режимах, включая сеть.' },
+    { id: 'revive', name: 'ВТОРОЙ ШАНС', chip: 'ШАНС', icon: '↺', price: 2400,
+      desc: 'Одно автоматическое возрождение за игру. В сети тоже срабатывает.' },
+    { id: 'lucky', name: 'ЗВЕЗДОПАД', chip: 'ЗВЁЗДЫ', icon: '★', price: 1800,
+      desc: 'Золотые звёзды появляются заметно чаще. В сети помогает обоим.' },
+    { id: 'rich', name: 'ЗОЛОТАЯ ЖИЛА', chip: '+50%', icon: '◆', price: 2000,
+      desc: '+50% неонов после каждой игры. Рекорды и награды сохраняются.' }
+  ];
+  const CHEAT_BY_ID = Object.fromEntries(CHEATS.map((c) => [c.id, c]));
+
+  const PROMO_CODES = {
+    NEON2026: { coins: 500 },
+    SNAKE777: { coins: 777 },
+    NEONRICH: { coins: 1000 },
+    GOLDSTAR: { skin: 'royal' },
+    HAPPYSNAKE: { coins: 300, skin: 'toxic' },
+    PIXELPOWER: { skin: 'pixel' },
+    RAINBOWCODE: { skin: 'rainbow' },
+    GHOSTMODE: { cheat: 'ghost' },
+    DOUBLEUP: { cheat: 'x2' },
+    SECONDSHOT: { cheat: 'revive' },
+    LUCKYSTAR: { cheat: 'lucky' },
+    GOLDDIGGER: { cheat: 'rich' }
+  };
+
   const SPEEDS = {
     slow: { base: 0.185, min: 0.095, ramp: 0.0028 },
     normal: { base: 0.155, min: 0.075, ramp: 0.0032 },
@@ -464,10 +522,36 @@
   }
 
   /* ================================================================ хранилище */
+  function defaultCheatFlags() {
+    const flags = {};
+    for (const cheat of CHEATS) flags[cheat.id] = false;
+    return flags;
+  }
+
+  function validSkinId(id) {
+    return typeof id === 'string' && !!SKIN_BY_ID[id] ? id : 'classic';
+  }
+
+  function validCheatIds(list) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    for (const id of list) {
+      if (CHEAT_BY_ID[id] && !out.includes(id)) out.push(id);
+    }
+    return out;
+  }
+
   function loadStore() {
     const data = {
       settings: Object.assign({}, DEFAULT_SETTINGS),
-      bests: { classic: 0, maze: 0, blitz: 0, chaos: 0, bots: 0, net: 0 }
+      bests: { classic: 0, maze: 0, blitz: 0, chaos: 0, bots: 0, net: 0 },
+      coins: 0,
+      skin: 'classic',
+      skins: ['classic'],
+      ownedCheats: [],
+      cheats: defaultCheatFlags(),
+      usedCodes: [],
+      daily: { last: '', streak: 0 }
     };
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -486,10 +570,44 @@
             if (Number.isFinite(value) && value >= 0) data.bests[mode] = Math.floor(value);
           }
         }
+        if (saved) {
+          const coins = Number(saved.coins);
+          if (Number.isFinite(coins) && coins >= 0) data.coins = Math.floor(coins);
+          data.skin = validSkinId(saved.skin);
+          if (Array.isArray(saved.skins)) {
+            for (const id of saved.skins) {
+              const clean = validSkinId(id);
+              if (SKIN_BY_ID[id] && !data.skins.includes(clean)) data.skins.push(clean);
+            }
+          }
+          data.ownedCheats = validCheatIds(saved.ownedCheats);
+          if (saved.cheats && typeof saved.cheats === 'object') {
+            for (const id of data.ownedCheats) data.cheats[id] = !!saved.cheats[id];
+          }
+          if (Array.isArray(saved.usedCodes)) {
+            for (const code of saved.usedCodes) {
+              if (typeof code === 'string' && code.length <= 24) {
+                const clean = code.toUpperCase();
+                if (!data.usedCodes.includes(clean)) data.usedCodes.push(clean);
+              }
+            }
+          }
+          if (saved.daily && typeof saved.daily === 'object') {
+            if (typeof saved.daily.last === 'string') {
+              data.daily.last = saved.daily.last.slice(0, 10);
+            }
+            const streak = Number(saved.daily.streak);
+            if (Number.isFinite(streak) && streak >= 0) {
+              data.daily.streak = Math.min(7, Math.floor(streak));
+            }
+          }
+        }
       }
     } catch (err) {
       /* приватный режим или повреждённые данные — играем на значениях по умолчанию */
     }
+    if (!data.skins.includes(data.skin)) data.skin = 'classic';
+    if (!data.skins.includes('classic')) data.skins.push('classic');
     return data;
   }
 
@@ -504,6 +622,96 @@
         /* переполнение или приватный режим: молча пропускаем */
       }
     }, 120);
+  }
+
+  /* ---------------------------------------------------------------- экономика */
+  function activeCheatFlags() {
+    const flags = defaultCheatFlags();
+    for (const id of store.ownedCheats) flags[id] = !!store.cheats[id];
+    return flags;
+  }
+
+  function activeCheatIds() {
+    return CHEATS.filter((cheat) => store.ownedCheats.includes(cheat.id) &&
+      store.cheats[cheat.id]).map((cheat) => cheat.id);
+  }
+
+  function cheatFlagsFromIds(list) {
+    const flags = defaultCheatFlags();
+    for (const id of validCheatIds(list)) flags[id] = true;
+    return flags;
+  }
+
+  function equippedSkin() {
+    return SKIN_BY_ID[store.skin] || SKINS[0];
+  }
+
+  function skinColorsAt(skinOrId, time) {
+    const skin = typeof skinOrId === 'string' ? SKIN_BY_ID[skinOrId] : skinOrId;
+    if (!skin) return SKINS[0].colors.slice();
+    if (skin.special === 'rainbow') {
+      const index = Math.floor((time || 0) * 1.7) % RAINBOW_PALETTES.length;
+      return RAINBOW_PALETTES[index].slice();
+    }
+    return skin.colors.slice();
+  }
+
+  function localDateKey(date) {
+    const d = date || new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function dailyStatus() {
+    const today = localDateKey();
+    const yesterday = localDateKey(new Date(Date.now() - 86400000));
+    const daily = store.daily || { last: '', streak: 0 };
+    const claimedToday = daily.last === today;
+    let nextStreak;
+    if (claimedToday) nextStreak = Math.max(1, daily.streak || 1);
+    else if (daily.last === yesterday) nextStreak = Math.min(7, (daily.streak || 0) + 1);
+    else nextStreak = 1;
+    return {
+      claimedToday,
+      streak: daily.streak || 0,
+      nextStreak,
+      reward: 40 + (nextStreak - 1) * 10
+    };
+  }
+
+  function addCoins(amount) {
+    const value = Math.floor(Number(amount));
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    store.coins += value;
+    saveStore();
+    ui.refreshWallet();
+    return value;
+  }
+
+  function unlockSkin(id) {
+    if (!SKIN_BY_ID[id] || store.skins.includes(id)) return false;
+    store.skins.push(id);
+    saveStore();
+    return true;
+  }
+
+  function unlockCheat(id) {
+    if (!CHEAT_BY_ID[id] || store.ownedCheats.includes(id)) return false;
+    store.ownedCheats.push(id);
+    store.cheats[id] = true;
+    saveStore();
+    return true;
+  }
+
+  function loadoutPayload() {
+    return { skin: store.skin, cheats: activeCheatIds() };
+  }
+
+  function parseLoadout(data) {
+    const source = data && typeof data === 'object' ? data : {};
+    return {
+      skin: validSkinId(source.skin),
+      cheats: validCheatIds(source.cheats)
+    };
   }
 
   /* ================================================================ звук */
@@ -670,6 +878,10 @@
       this.netGuestSeen = 0;
       this.netHostSeen = 0;
       this.netGuestId = '';
+      this.netGuestSkin = 'classic';
+      this.netGuestCheats = [];
+      this.netHostSkin = 'classic';
+      this.netHostCheats = [];
       this.netJoinAttempts = 0;
       this.netReconnects = 0;
       this.netJoinTimer = 0;
@@ -713,7 +925,17 @@
       }
       this.interval = this.baseInt;
       this.powerEvery = POWER_EVERY[mode] || 4;
-      this.specialEvery = SPECIAL_EVERY[settings.specials] || 4;
+      this.cheats = activeCheatFlags();
+      this.scoreMult = this.cheats.x2 ? 2 : 1;
+      this.revives = this.cheats.revive ? 1 : 0;
+      this.coinMult = this.cheats.rich ? 1.5 : 1;
+      let specialEvery = SPECIAL_EVERY[settings.specials] || 4;
+      if (this.cheats.lucky) specialEvery = Math.max(2, specialEvery - 2);
+      if (mode === 'net' && this.netRole === 'host' && !this.cheats.lucky &&
+          this.netGuestCheats.includes('lucky')) {
+        specialEvery = Math.max(2, specialEvery - 2);
+      }
+      this.specialEvery = specialEvery;
 
       const cy = Math.floor(ROWS / 2);
       const cx = Math.floor(COLS / 2);
@@ -755,13 +977,15 @@
       this.netLost = false;
       this.deathReason = 'crash';
       this.newRecord = false;
+      this.rewarded = false;
+      this.rewardCoins = 0;
+      this.rewardRecordBonus = 0;
       this.timeLeft = mode === 'blitz' ? 60 : (mode === 'net' ? NET_TIME : null);
       this.walls = new Set();
       if (mode === 'maze') this.buildWalls();
       this.rivals = [];
-      this.playerColors = mode === 'net'
-        ? (this.netRole === 'guest' ? NET_GUEST_COLORS : NET_HOST_COLORS)
-        : PLAYER_COLORS;
+      this.playerSkin = equippedSkin();
+      this.playerColors = skinColorsAt(this.playerSkin, 0);
       if (mode === 'bots') this.spawnBots();
       if (mode === 'net' && this.netRole === 'host') this.spawnNetGuest();
       this.food = null;
@@ -887,7 +1111,8 @@
         name, colors, body: body.map((c) => c.slice()),
         prev: body.map((c) => c.slice()), dir: dir.slice(), queue: [],
         score: 0, alive: true, respawn: 0, ai: true,
-        apples: 0, stars: 0, powers: 0
+        apples: 0, stars: 0, powers: 0,
+        skin: 'classic', cheats: defaultCheatFlags(), revives: 0
       };
     }
 
@@ -905,9 +1130,13 @@
 
     spawnNetGuest() {
       const cy = Math.floor(ROWS / 2);
-      const rival = this.makeRival('ГОСТЬ', NET_GUEST_COLORS,
+      const skin = SKIN_BY_ID[this.netGuestSkin] || SKINS[0];
+      const rival = this.makeRival('ГОСТЬ', skinColorsAt(skin, 0),
         [[COLS - 6, cy], [COLS - 5, cy], [COLS - 4, cy], [COLS - 3, cy]], [-1, 0]);
       rival.ai = false;
+      rival.skin = skin.id;
+      rival.cheats = cheatFlagsFromIds(this.netGuestCheats);
+      rival.revives = rival.cheats.revive ? 1 : 0;
       this.rivals = [rival];
     }
 
@@ -963,6 +1192,17 @@
 
     killRival(rival) {
       if (!rival.alive) return;
+      if (this.mode === 'net' && (rival.revives || 0) > 0) {
+        rival.revives -= 1;
+        const oldBody = rival.body;
+        rival.alive = false;
+        rival.body = [];
+        if (this.respawnRival(rival)) {
+          fx.banner('ВТОРОЙ ШАНС!', GOLD);
+          return;
+        }
+        rival.body = oldBody;
+      }
       rival.alive = false;
       rival.respawn = this.mode === 'bots' ? 2.6 : 0;
       if (rival.body.length) {
@@ -984,9 +1224,12 @@
         rival.dir = rival.queue.shift();
       }
       const [dx, dy] = rival.dir;
+      const cheats = rival.cheats || {};
+      const ghost = !!cheats.ghost;
+      const scoreMult = cheats.x2 ? 2 : 1;
       let head = [rival.body[0][0] + dx, rival.body[0][1] + dy];
       let outside = !this.inside(head[0], head[1]);
-      if (outside && this.wrap) {
+      if (outside && (this.wrap || ghost)) {
         head = [(head[0] + COLS) % COLS, (head[1] + ROWS) % ROWS];
         outside = false;
       }
@@ -994,12 +1237,12 @@
       const eatSpecial = this.special && same(head, this.special.pos);
       const eatPower = this.powerup && same(head, this.powerup.pos);
       const body = eat ? rival.body : rival.body.slice(0, -1);
-      const blocked = body.some((c) => same(c, head)) ||
-        this.walls.has(this.key(head)) ||
+      const bodyBlocked = body.some((c) => same(c, head));
+      const worldBlocked = this.walls.has(this.key(head)) ||
         this.meteors.has(this.key(head)) ||
         this.snake.some((c) => same(c, head)) ||
         this.otherRivalCells(rival).has(this.key(head));
-      if (outside || blocked) {
+      if (outside || bodyBlocked || (worldBlocked && !ghost)) {
         this.killRival(rival);
         return;
       }
@@ -1007,19 +1250,19 @@
       rival.body.unshift(head);
       if (!eat) rival.body.pop();
       if (eat) {
-        rival.score += 10;
+        rival.score += 10 * scoreMult;
         rival.apples += 1;
         this.newFood();
         fx.burst(head, rival.colors[1], 7);
       }
       if (eatSpecial) {
-        rival.score += 30;
+        rival.score += 30 * scoreMult;
         rival.stars += 1;
         this.special = null;
         fx.ring(head, GOLD, 40, 0.45);
       }
       if (eatPower) {
-        rival.score += 15;
+        rival.score += 15 * scoreMult;
         rival.powers += 1;
         this.powerup = null;
         fx.ring(head, VIOLET, 40, 0.45);
@@ -1169,8 +1412,9 @@
       const [hx, hy] = this.snake[0];
       let head = [hx + dx, hy + dy];
       let outside = !this.inside(head[0], head[1]);
-      const invincible = (this.effects.shield || 0) > 0;
-      if (outside && (this.wrap || invincible)) {
+      const shield = (this.effects.shield || 0) > 0;
+      const ghost = !!this.cheats.ghost;
+      if (outside && (this.wrap || shield || ghost)) {
         head = [(head[0] + COLS) % COLS, (head[1] + ROWS) % ROWS];
         outside = false;
       }
@@ -1179,11 +1423,11 @@
       const eatPower = this.powerup && same(head, this.powerup.pos);
       const grow = (eatNormal ? 1 : 0) + (eatSpecial ? 2 : 0);
       const body = grow ? this.snake : this.snake.slice(0, -1);
-      const blocked = body.some((c) => same(c, head)) ||
-        this.walls.has(this.key(head)) ||
+      const bodyBlocked = body.some((c) => same(c, head));
+      const worldBlocked = this.walls.has(this.key(head)) ||
         this.meteors.has(this.key(head)) ||
         this.rivalCells().has(this.key(head));
-      if (outside || (blocked && !invincible)) {
+      if (outside || (bodyBlocked && !shield) || (worldBlocked && !shield && !ghost)) {
         this.die('crash');
         return;
       }
@@ -1212,7 +1456,7 @@
       this.comboTimer = (this.mode === 'blitz' || this.mode === 'chaos') ? 2.5 : 3.0;
       this.maxCombo = Math.max(this.maxCombo, this.combo);
       const mult = (this.effects.double || 0) > 0 ? 2 : 1;
-      const gain = 10 * this.combo * mult;
+      const gain = 10 * this.combo * mult * this.scoreMult;
       this.score += gain;
       this.scorePulse = 1;
       this.apples += 1;
@@ -1229,7 +1473,7 @@
 
     eatSpecial(cell) {
       const mult = (this.effects.double || 0) > 0 ? 2 : 1;
-      const gain = 30 * Math.max(1, this.combo) * mult;
+      const gain = 30 * Math.max(1, this.combo) * mult * this.scoreMult;
       this.score += gain;
       this.scorePulse = 1;
       this.stars += 1;
@@ -1245,12 +1489,13 @@
       this.powerup = null;
       const duration = POWER_DURATION[kind] || 8;
       this.effects[kind] = Math.max(this.effects[kind] || 0, duration);
-      this.score += 15;
+      const gain = 15 * this.scoreMult;
+      this.score += gain;
       this.scorePulse = 1;
       this.powers += 1;
       const color = EFFECT_INFO[kind].color;
       if (this.settings.shake) this.shake = Math.max(this.shake, 3);
-      this.pendingEat(cell, color, POWER_TEXT[kind] + '  +15', mix(color, '#ffffff', 0.45));
+      this.pendingEat(cell, color, POWER_TEXT[kind] + '  +' + gain, mix(color, '#ffffff', 0.45));
       Sfx.play('power');
       haptic(12);
     }
@@ -1434,6 +1679,10 @@
 
     die(reason) {
       if (this.state !== 'playing') return;
+      if ((this.revives || 0) > 0 && reason !== 'time') {
+        this.revives -= 1;
+        if (this.reviveSnake()) return;
+      }
       this.state = 'dead';
       this.deathReason = reason || 'crash';
       this.deadAt = this.time;
@@ -1468,6 +1717,48 @@
       else this.scheduleDeathOverlay(700);
     }
 
+    reviveSnake() {
+      const cells = this.freeCells();
+      const free = new Set(cells.map((c) => this.key(c)));
+      for (let i = cells.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+      }
+      for (const cell of cells) {
+        for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const body = [];
+          let ok = true;
+          for (let i = 0; i < 4; i += 1) {
+            let c = [cell[0] - d[0] * i, cell[1] - d[1] * i];
+            if (this.wrap) c = [(c[0] + COLS) % COLS, (c[1] + ROWS) % ROWS];
+            else if (!this.inside(c[0], c[1])) { ok = false; break; }
+            if (!free.has(this.key(c))) { ok = false; break; }
+            body.push(c);
+          }
+          if (!ok) continue;
+          this.snake = body;
+          this.prevSnake = body.map((c) => c.slice());
+          this.dir = d.slice();
+          this.queue = [];
+          this.state = 'playing';
+          this.deadTimer = 0;
+          this.acc = 0;
+          this.tRender = 0;
+          this.combo = 1;
+          this.comboTimer = 0;
+          this.effects.shield = Math.max(this.effects.shield || 0, 3);
+          this.pendingEats = [];
+          this.flash = 0.8;
+          if (this.settings.shake) this.shake = Math.max(this.shake, 6);
+          fx.banner('ВТОРОЙ ШАНС!', GOLD);
+          Sfx.play('special');
+          haptic(24);
+          return true;
+        }
+      }
+      return false;
+    }
+
     particlesBurstAt(x, y, color) {
       if (!this.settings.particles) return;
       const a = Math.random() * Math.PI * 2;
@@ -1488,6 +1779,27 @@
       } else {
         this.newRecord = false;
       }
+      this.grantCoins();
+    }
+
+    grantCoins() {
+      if (this.rewarded) return;
+      this.rewarded = true;
+      const base = Math.floor(this.score / 5) + this.apples * 3 +
+        this.stars * 6 + this.powers * 4;
+      const recordBonus = this.newRecord ? 150 : 0;
+      let netBonus = 0;
+      if (this.mode === 'net') {
+        netBonus = 15;
+        const myWinner = this.netRole === 'guest' ? 2 : 1;
+        if (this.netWinner === myWinner) netBonus += 30;
+      }
+      const total = Math.max(1, Math.round((base + recordBonus + netBonus) * this.coinMult));
+      this.rewardCoins = total;
+      this.rewardRecordBonus = recordBonus;
+      store.coins += total;
+      saveStore();
+      ui.refreshWallet();
     }
 
     /* ---------------------------------------------------------- сеть */
@@ -1604,7 +1916,8 @@
 
     sendNetJoin() {
       if (this.netRole !== 'guest' || this.netHostLinked) return;
-      if (!this.netSend({ t: 'join', v: 1, id: this.netClientId })) return;
+      const payload = Object.assign({ t: 'join', v: 1, id: this.netClientId }, loadoutPayload());
+      if (!this.netSend(payload)) return;
       this.netJoinAttempts += 1;
       if (this.netJoinAttempts >= 8) {
         ui.setJoinStatus('ХОСТ НЕ ОТВЕЧАЕТ · ПРОВЕРЬТЕ КОД', 'err');
@@ -1674,6 +1987,10 @@
       this.netHaveState = false;
       this.netSendTimer = 0;
       this.netCountdown = 0;
+      this.netGuestSkin = 'classic';
+      this.netGuestCheats = [];
+      this.netHostSkin = 'classic';
+      this.netHostCheats = [];
       this.playerColors = null;
     }
 
@@ -1733,8 +2050,11 @@
           const id = typeof data.id === 'string' ? data.id.slice(0, 24) : '';
           if (this.netGuestLinked && id && this.netGuestId && id !== this.netGuestId) return;
           if (id) this.netGuestId = id;
+          const loadout = parseLoadout(data);
+          this.netGuestSkin = loadout.skin;
+          this.netGuestCheats = loadout.cheats;
           this.netGuestSeen = now;
-          this.onGuestJoin();
+          this.onGuestJoin(data);
           return;
         }
         if (data.t === 'bye') {
@@ -1745,6 +2065,9 @@
         this.netGuestSeen = now;
         if (data.t === 'input') this.netApplyInput(data);
         else if (data.t === 'rematch' && this.netOver) {
+          const loadout = parseLoadout(data);
+          this.netGuestSkin = loadout.skin;
+          this.netGuestCheats = loadout.cheats;
           this.netSend({ t: 'again' });
           this.beginNetMatch();
         }
@@ -1754,7 +2077,7 @@
           return;
         }
         this.netHostSeen = now;
-        if (data.t === 'welcome') this.onHostWelcome();
+        if (data.t === 'welcome') this.onHostWelcome(data);
         else if (data.t === 'state') this.applyNetState(data);
         else if (data.t === 'over') this.applyNetOver(data);
         else if (data.t === 'again' && this.netHostLinked) this.beginNetMatch();
@@ -1765,7 +2088,8 @@
       if (this.netRole !== 'host' || !this.broker || !this.broker.connected) return;
       this.netGuestLinked = true;
       this.netGuestSeen = performance.now();
-      this.netSend({ t: 'welcome', v: 1 });
+      const welcome = Object.assign({ t: 'welcome', v: 1 }, loadoutPayload());
+      this.netSend(welcome);
       if (this.netActive && !this.netOver &&
           (this.state === 'playing' || this.state === 'countdown')) {
         this.netHostSend(0, true);
@@ -1774,8 +2098,11 @@
       this.beginNetMatch();
     }
 
-    onHostWelcome() {
+    onHostWelcome(data) {
       if (this.netRole !== 'guest' || this.netHostLinked) return;
+      const loadout = parseLoadout(data);
+      this.netHostSkin = loadout.skin;
+      this.netHostCheats = loadout.cheats;
       this.netHostLinked = true;
       this.netHostSeen = performance.now();
       clearTimeout(this.netJoinTimer);
@@ -1969,11 +2296,14 @@
       const p1 = msg.p1 && typeof msg.p1 === 'object' ? msg.p1 : {};
       const hostBody = Game.parseCells(p1.b);
       const hostPrev = Game.parseCells(p1.pv);
+      const hostSkin = SKIN_BY_ID[this.netHostSkin] || SKINS[0];
       if (!this.rivals.length) {
-        this.rivals = [this.makeRival('ХОСТ', NET_HOST_COLORS, hostBody, [1, 0])];
+        this.rivals = [this.makeRival('ХОСТ', skinColorsAt(hostSkin, this.time), hostBody, [1, 0])];
         this.rivals[0].ai = false;
       }
       const rival = this.rivals[0];
+      rival.skin = hostSkin.id;
+      rival.cheats = cheatFlagsFromIds(this.netHostCheats);
       if (hostBody.length) {
         rival.body = hostBody;
         rival.prev = hostPrev.length ? hostPrev : hostBody.map((c) => c.slice());
@@ -2416,7 +2746,10 @@
       if (!this.snake.length) return;
       const alpha = this.state === 'playing' ? this.tRender : (this.state === 'dead' ? 1 : 0);
       const pts = this.snakePoints(this.prevSnake, this.snake, alpha);
-      const colors = this.playerColors || PLAYER_COLORS;
+      const colors = this.playerSkin
+        ? skinColorsAt(this.playerSkin, this.time)
+        : (this.playerColors || PLAYER_COLORS);
+      this.playerColors = colors;
       this.drawSnakePath(ctx, pts, colors, this.dir, true,
         this.state === 'playing' || this.state === 'countdown');
     }
@@ -2425,7 +2758,9 @@
       if (!rival.body.length) return;
       const alpha = this.state === 'playing' ? this.tRender : 1;
       const pts = this.snakePoints(rival.prev, rival.body, alpha);
-      this.drawSnakePath(ctx, pts, rival.colors, rival.dir, false, rival.alive);
+      const colors = rival.skin ? skinColorsAt(rival.skin, this.time) : rival.colors;
+      rival.colors = colors;
+      this.drawSnakePath(ctx, pts, colors, rival.dir, false, rival.alive);
       if (!rival.alive) {
         ctx.save();
         ctx.globalAlpha = 0.55;
@@ -2655,12 +2990,22 @@
           if (value > 0) active.push({ key, value, info: EFFECT_INFO[key] });
         }
       }
+      for (const cheat of CHEATS) {
+        if (this.cheats && this.cheats[cheat.id]) {
+          active.push({
+            key: 'cheat-' + cheat.id, value: 0, cheat: true,
+            info: { label: cheat.chip, color: GOLD }
+          });
+        }
+      }
       const sig = active.map((e) => e.key + Math.ceil(e.value)).join('|');
       if (sig === this._fxSig) return;
       this._fxSig = sig;
       box.innerHTML = active.map((e) => (
-        '<span class="fx-chip" style="--c:' + e.info.color + '">' +
-        e.info.label + ' <b>' + Math.ceil(e.value) + '</b></span>'
+        '<span class="fx-chip' + (e.cheat ? ' fx-cheat' : '') +
+        '" style="--c:' + e.info.color + '">' +
+        (e.cheat ? 'ЧИТ ' : '') + e.info.label +
+        (e.cheat ? '' : ' <b>' + Math.ceil(e.value) + '</b>') + '</span>'
       )).join('');
     }
 
@@ -2749,6 +3094,10 @@
       const title = timeUp ? 'ВРЕМЯ ВЫШЛО' : 'ЗМЕЙКА РАЗБИЛАСЬ';
       const kicker = MODE_BY_ID[this.mode].name;
       const record = this.newRecord ? '<span class="overlay-record">НОВЫЙ РЕКОРД!</span>' : '';
+      const reward = this.rewardCoins
+        ? '<p class="overlay-reward">+ ' + this.rewardCoins + ' ◆ НЕОНОВ' +
+          (this.rewardRecordBonus ? ' · РЕКОРД +' + this.rewardRecordBonus : '') + '</p>'
+        : '';
       const stats = 'ЯБЛОК: ' + this.apples + ' · ЗВЁЗД: ' + this.stars +
         ' · БОНУСОВ: ' + this.powers + ' · КОМБО ×' + this.maxCombo;
       ui.showOverlay(
@@ -2758,6 +3107,7 @@
         '<div class="overlay-score">' + Math.floor(this.score) + '<small>ОЧКОВ</small></div>' +
         '<p class="overlay-text">' + stats + '</p>' +
         '<p class="overlay-text">РЕКОРД: ' + (store.bests[this.mode] || 0) + '</p>' +
+        reward +
         '<div class="overlay-actions">' +
         '<button class="btn btn-primary" id="ov-again">ЕЩЁ РАЗ</button>' +
         '<button class="btn" id="ov-modes">СМЕНИТЬ РЕЖИМ</button>' +
@@ -2803,6 +3153,10 @@
       let reasonText = reasons[this.deathReason] || '';
       if (!this.netLost && !this.netWinner) reasonText = '';
       const record = this.newRecord ? '<span class="overlay-record">НОВЫЙ РЕКОРД!</span>' : '';
+      const reward = this.rewardCoins
+        ? '<p class="overlay-reward">+ ' + this.rewardCoins + ' ◆ НЕОНОВ' +
+          (this.rewardRecordBonus ? ' · РЕКОРД +' + this.rewardRecordBonus : '') + '</p>'
+        : '';
       const canRematch = !this.netLost && this.canReachPeer();
       const again = canRematch ? '<button class="btn btn-primary" id="ov-again">ЕЩЁ РАЗ</button>' : '';
       ui.showOverlay(
@@ -2810,6 +3164,7 @@
         '<h3>' + title + '</h3>' +
         '<p class="overlay-text">' + reasonText + '</p>' +
         record +
+        reward +
         '<div class="overlay-vs">' +
         '<div><span>ВЫ</span><b>' + myScore + '</b></div>' +
         '<span class="vs-sign">VS</span>' +
@@ -2828,7 +3183,7 @@
             return;
           }
           if (guest) {
-            this.netSend({ t: 'rematch' });
+            this.netSend(Object.assign({ t: 'rematch' }, loadoutPayload()));
             ui.toast('ОЖИДАЕМ ХОСТА…');
           } else {
             this.netSend({ t: 'again' });
@@ -2887,7 +3242,254 @@
         screen.classList.toggle('active', screen.dataset.screen === name);
       }
       this.screen = name;
-      if (name === 'menu') game.refreshBests();
+      if (name === 'menu') {
+        game.refreshBests();
+        this.refreshWallet();
+      } else if (name === 'shop') {
+        this.renderShop();
+      }
+    },
+
+    refreshWallet() {
+      const coins = String(store.coins);
+      const menuCoins = $('#coin-balance');
+      const shopCoins = $('#shop-coins');
+      if (menuCoins) menuCoins.textContent = coins;
+      if (shopCoins) shopCoins.textContent = coins;
+      const dot = $('#daily-dot');
+      if (dot) dot.classList.toggle('hidden', dailyStatus().claimedToday);
+      if (this.screen === 'shop') this.renderDailyCard();
+    },
+
+    renderDailyCard() {
+      const card = $('#daily-card');
+      if (!card) return;
+      const daily = dailyStatus();
+      const note = $('#daily-note');
+      const btn = $('#daily-btn');
+      if (daily.claimedToday) {
+        if (note) note.textContent = 'Серия: ' + daily.streak + ' дн. Следующий бонус — завтра.';
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'ПОЛУЧЕНО';
+        }
+      } else {
+        if (note) {
+          note.textContent = 'Серия: ' + daily.nextStreak +
+            ' дн. · награда ' + daily.reward + ' ◆';
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'ЗАБРАТЬ ' + daily.reward + ' ◆';
+        }
+      }
+    },
+
+    claimDaily() {
+      const daily = dailyStatus();
+      if (daily.claimedToday) {
+        this.toast('БОНУС УЖЕ ПОЛУЧЕН СЕГОДНЯ');
+        return;
+      }
+      store.daily = { last: localDateKey(), streak: daily.nextStreak };
+      addCoins(daily.reward);
+      Sfx.play('special');
+      haptic(20);
+      this.toast('ЕЖЕДНЕВНЫЙ БОНУС +' + daily.reward + ' ◆', 3000);
+      this.renderShop();
+    },
+
+    renderShop() {
+      this.renderDailyCard();
+      this.renderShopSkins();
+      this.renderShopCheats();
+      this.refreshWallet();
+      this.setShopTab(this.shopTab || 'skins');
+    },
+
+    renderShopSkins() {
+      const list = $('#skin-list');
+      if (!list) return;
+      list.innerHTML = SKINS.map((skin) => {
+        const owned = store.skins.includes(skin.id);
+        const equipped = store.skin === skin.id;
+        let label;
+        let cls = 'shop-buy';
+        let attr;
+        if (equipped) {
+          label = 'ВЫБРАН';
+          cls += ' equipped';
+          attr = 'data-equip-skin="' + skin.id + '" disabled';
+        } else if (owned) {
+          label = 'ВЫБРАТЬ';
+          cls += ' owned';
+          attr = 'data-equip-skin="' + skin.id + '"';
+        } else {
+          label = 'КУПИТЬ · ' + skin.price + ' ◆';
+          cls += ' buy';
+          attr = 'data-buy-skin="' + skin.id + '"';
+        }
+        return '<article class="shop-item' + (equipped ? ' equipped' : (owned ? ' owned' : '')) + '">' +
+          '<div class="skin-preview" style="--s0:' + skin.colors[0] +
+          ';--s1:' + skin.colors[1] + ';--s2:' + skin.colors[2] + '"></div>' +
+          '<div class="shop-item-body"><b>' + skin.name + '</b><small>' + skin.desc + '</small></div>' +
+          '<button class="' + cls + '" ' + attr + '>' + label + '</button></article>';
+      }).join('');
+    },
+
+    renderShopCheats() {
+      const list = $('#cheat-list');
+      if (!list) return;
+      list.innerHTML = CHEATS.map((cheat) => {
+        const owned = store.ownedCheats.includes(cheat.id);
+        const active = owned && !!store.cheats[cheat.id];
+        let label;
+        let cls = 'shop-buy';
+        let attr;
+        if (!owned) {
+          label = 'КУПИТЬ · ' + cheat.price + ' ◆';
+          cls += ' buy';
+          attr = 'data-buy-cheat="' + cheat.id + '"';
+        } else if (active) {
+          label = 'ВКЛ';
+          cls += ' cheat-on';
+          attr = 'data-toggle-cheat="' + cheat.id + '"';
+        } else {
+          label = 'ВЫКЛ';
+          cls += ' cheat-off';
+          attr = 'data-toggle-cheat="' + cheat.id + '"';
+        }
+        return '<article class="shop-item' + (owned ? ' owned' : '') + '">' +
+          '<div class="cheat-icon">' + cheat.icon + '</div>' +
+          '<div class="shop-item-body"><b>' + cheat.name + '</b><small>' +
+          cheat.desc + '</small></div>' +
+          '<button class="' + cls + '" ' + attr + '>' + label + '</button></article>';
+      }).join('');
+    },
+
+    setShopTab(tab) {
+      this.shopTab = tab;
+      for (const btn of $$('.shop-tab')) {
+        btn.classList.toggle('active', btn.dataset.shoptab === tab);
+      }
+      $('#shop-skins-panel').classList.toggle('hidden', tab !== 'skins');
+      $('#shop-cheats-panel').classList.toggle('hidden', tab !== 'cheats');
+      $('#shop-codes-panel').classList.toggle('hidden', tab !== 'codes');
+    },
+
+    buySkin(id) {
+      const skin = SKIN_BY_ID[id];
+      if (!skin) return;
+      if (store.skins.includes(id)) {
+        store.skin = id;
+        saveStore();
+        this.renderShop();
+        this.toast('СКИН: ' + skin.name);
+        return;
+      }
+      if (store.coins < skin.price) {
+        this.toast('НЕ ХВАТАЕТ НЕОНОВ: НУЖНО ' + skin.price + ' ◆', 3000);
+        return;
+      }
+      store.coins -= skin.price;
+      store.skins.push(id);
+      store.skin = id;
+      saveStore();
+      this.renderShop();
+      Sfx.play('special');
+      haptic(16);
+      this.toast('КУПЛЕНО: ' + skin.name, 2600);
+    },
+
+    buyCheat(id) {
+      const cheat = CHEAT_BY_ID[id];
+      if (!cheat) return;
+      if (store.ownedCheats.includes(id)) {
+        store.cheats[id] = !store.cheats[id];
+        saveStore();
+        this.renderShopCheats();
+        this.toast(store.cheats[id] ? 'ЧИТ ВКЛЮЧЁН: ' + cheat.name : 'ЧИТ ВЫКЛЮЧЕН');
+        return;
+      }
+      if (store.coins < cheat.price) {
+        this.toast('НЕ ХВАТАЕТ НЕОНОВ: НУЖНО ' + cheat.price + ' ◆', 3000);
+        return;
+      }
+      store.coins -= cheat.price;
+      store.ownedCheats.push(id);
+      store.cheats[id] = true;
+      saveStore();
+      this.renderShop();
+      Sfx.play('special');
+      haptic(16);
+      this.toast('ЧИТ ОТКРЫТ: ' + cheat.name, 2800);
+    },
+
+    redeemCode() {
+      const input = $('#promo-input');
+      const status = $('#code-status');
+      if (!input) return;
+      const code = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 24);
+      input.value = code;
+      if (status) status.className = 'code-status';
+      if (code.length < 3) {
+        if (status) {
+          status.textContent = 'ВВЕДИТЕ КОД';
+          status.className = 'code-status err';
+        }
+        return;
+      }
+      if (store.usedCodes.includes(code)) {
+        if (status) {
+          status.textContent = 'ЭТОТ КОД УЖЕ ИСПОЛЬЗОВАН';
+          status.className = 'code-status err';
+        }
+        return;
+      }
+      const promo = PROMO_CODES[code];
+      if (!promo) {
+        if (status) {
+          status.textContent = 'НЕВЕРНЫЙ КОД';
+          status.className = 'code-status err';
+        }
+        haptic(10);
+        return;
+      }
+      const rewards = [];
+      let coinsGain = Number(promo.coins) || 0;
+      if (promo.skin) {
+        const skin = SKIN_BY_ID[promo.skin];
+        if (unlockSkin(promo.skin)) {
+          rewards.push('СКИН ' + skin.name);
+        } else {
+          coinsGain += Math.max(50, Math.floor(skin.price / 2));
+          rewards.push('КОМПЕНСАЦИЯ ' + Math.max(50, Math.floor(skin.price / 2)) + ' ◆');
+        }
+      }
+      if (promo.cheat) {
+        const cheat = CHEAT_BY_ID[promo.cheat];
+        if (unlockCheat(promo.cheat)) {
+          rewards.push('ЧИТ ' + cheat.name);
+        } else {
+          coinsGain += Math.max(50, Math.floor(cheat.price / 2));
+          rewards.push('КОМПЕНСАЦИЯ ' + Math.max(50, Math.floor(cheat.price / 2)) + ' ◆');
+        }
+      }
+      if (coinsGain > 0) {
+        store.coins += coinsGain;
+        rewards.unshift('+' + coinsGain + ' ◆');
+      }
+      store.usedCodes.push(code);
+      saveStore();
+      input.value = '';
+      this.renderShop();
+      Sfx.play('special');
+      haptic(20);
+      if (status) {
+        status.textContent = 'КОД АКТИВИРОВАН: ' + rewards.join(' · ');
+        status.className = 'code-status ok';
+      }
+      this.toast('КОД АКТИВИРОВАН', 2600);
     },
 
     showOverlay(html) {
@@ -3068,6 +3670,10 @@
         '<b style="color:#b06bff">РЕЖИМЫ</b><br>' +
         'Классика, лабиринт, блиц 60 секунд, хаос с метеоритами, два бота-соперника и сеть по коду комнаты.' +
         '</p>' +
+        '<p class="overlay-text" style="text-align:left">' +
+        '<b style="color:#ffd24a">НЕОНЫ И МАГАЗИН</b><br>' +
+        'Играй, ставь рекорды, побеждай в сети и забирай ежедневный бонус. На неоны покупай скины, читы и открывай секретные коды.' +
+        '</p>' +
         '<div class="overlay-actions">' +
         '<button class="btn btn-primary" id="ov-close">ПОНЯТНО</button>' +
         '</div>'
@@ -3139,6 +3745,8 @@
       haptic(6);
       if (action === 'play') {
         ui.showScreen('modes');
+      } else if (action === 'shop') {
+        ui.showScreen('shop');
       } else if (action === 'settings') {
         renderSettings();
         ui.showScreen('settings');
@@ -3171,6 +3779,46 @@
     });
   }
 
+  for (const tab of $$('.shop-tab')) {
+    tab.addEventListener('click', () => {
+      Sfx.play('menu');
+      ui.setShopTab(tab.dataset.shoptab);
+    });
+  }
+
+  $('#daily-btn').addEventListener('click', () => {
+    Sfx.unlock();
+    ui.claimDaily();
+  });
+
+  $('#promo-btn').addEventListener('click', () => {
+    Sfx.unlock();
+    ui.redeemCode();
+  });
+
+  const promoInput = $('#promo-input');
+  promoInput.addEventListener('input', () => {
+    promoInput.value = promoInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 24);
+  });
+  promoInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      ui.redeemCode();
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    const buySkin = event.target.closest('[data-buy-skin], [data-equip-skin]');
+    if (buySkin) {
+      ui.buySkin(buySkin.dataset.buySkin || buySkin.dataset.equipSkin);
+      return;
+    }
+    const cheatBtn = event.target.closest('[data-buy-cheat], [data-toggle-cheat]');
+    if (cheatBtn) {
+      ui.buyCheat(cheatBtn.dataset.buyCheat || cheatBtn.dataset.toggleCheat);
+    }
+  });
+
   document.addEventListener('click', (event) => {
     const segment = event.target.closest('.segment button');
     if (segment) {
@@ -3201,7 +3849,7 @@
     ui.showOverlay(
       '<p class="overlay-kicker">РЕКОРДЫ</p>' +
       '<h3>СБРОСИТЬ ВСЁ?</h3>' +
-      '<p class="overlay-text">Все рекорды шести режимов будут удалены. Настройки останутся.</p>' +
+      '<p class="overlay-text">Все рекорды шести режимов будут удалены. Настройки, неоны и покупки останутся.</p>' +
       '<div class="overlay-actions">' +
       '<button class="btn btn-primary" id="ov-reset-ok">СБРОСИТЬ</button>' +
       '<button class="btn btn-ghost" id="ov-close">ОТМЕНА</button>' +
@@ -3380,7 +4028,7 @@
 
   window.addEventListener('pagehide', () => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); } catch (err) { /* нет места */ }
-    if (game.conn) game.closeNet();
+    if (game.broker) game.closeNet();
   });
 
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
@@ -3405,6 +4053,7 @@
 
   game.refreshBests();
   renderSettings();
+  saveStore();
   ui.showScreen('menu');
   requestAnimationFrame(loop);
 

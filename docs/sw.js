@@ -1,5 +1,5 @@
 /* NEON SNAKE — офлайн-кэш PWA. */
-const CACHE = 'neon-snake-v3';
+const CACHE = 'neon-snake-v4';
 const ASSETS = [
   './',
   './index.html',

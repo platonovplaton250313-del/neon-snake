@@ -33,12 +33,19 @@
       <p class="eyebrow">НЕОНОВАЯ АРКАДА</p>
       <h1 class="brand"><span>NEON</span><span>SNAKE</span></h1>
       <p class="tagline">Шесть режимов. Одна змея.<br>Бесконечный неон.</p>
+      <button class="coin-pill" data-action="shop" aria-label="Открыть магазин">
+        <span class="coin-glyph">◆</span>
+        <b id="coin-balance">0</b>
+        <span class="coin-word">НЕОНОВ</span>
+        <em class="daily-dot hidden" id="daily-dot">БОНУС</em>
+      </button>
     </div>
 
     <div class="menu-actions">
       <button class="btn btn-primary" data-action="play">
         <span class="btn-glow"></span>ИГРАТЬ
       </button>
+      <button class="btn btn-shop" data-action="shop">МАГАЗИН</button>
       <button class="btn" data-action="settings">НАСТРОЙКИ</button>
       <button class="btn btn-ghost" data-action="howto">КАК ИГРАТЬ</button>
     </div>
@@ -186,7 +193,59 @@
     </div>
 
     <button class="btn btn-danger" id="reset-records">СБРОСИТЬ РЕКОРДЫ</button>
-    <p class="settings-note">Настройки сохраняются на этом устройстве.</p>
+    <p class="settings-note">Настройки, неоны и покупки сохраняются на этом устройстве.</p>
+  </section>
+
+  <!-- МАГАЗИН -->
+  <section class="screen screen-shop" data-screen="shop">
+    <header class="screen-head">
+      <button class="icon-btn" data-action="menu" aria-label="В меню">←</button>
+      <h2>МАГАЗИН</h2>
+      <span class="shop-balance"><span>◆</span><b id="shop-coins">0</b></span>
+    </header>
+
+    <div class="shop-scroll">
+      <div class="daily-card" id="daily-card">
+        <span class="daily-icon">★</span>
+        <span class="daily-copy">
+          <b>ЕЖЕДНЕВНЫЙ БОНУС</b>
+          <small id="daily-note">Заходи каждый день — награда растёт</small>
+        </span>
+        <button class="daily-btn" id="daily-btn">ЗАБРАТЬ</button>
+      </div>
+
+      <div class="shop-tabs">
+        <button class="shop-tab active" data-shoptab="skins">СКИНЫ</button>
+        <button class="shop-tab" data-shoptab="cheats">ЧИТЫ</button>
+        <button class="shop-tab" data-shoptab="codes">КОДЫ</button>
+      </div>
+
+      <div class="shop-panel" id="shop-skins-panel">
+        <p class="shop-lead">Скины меняют вид змейки. Купленный скин можно выбрать в любой момент.</p>
+        <div class="shop-list" id="skin-list"></div>
+      </div>
+
+      <div class="shop-panel hidden" id="shop-cheats-panel">
+        <p class="shop-lead">Читы работают во всех режимах, включая сетевую игру. Рекорды и неоны при этом сохраняются.</p>
+        <div class="shop-list" id="cheat-list"></div>
+      </div>
+
+      <div class="shop-panel hidden" id="shop-codes-panel">
+        <p class="shop-lead">Введите промокод или секретный код. Каждый код можно активировать один раз на этом устройстве.</p>
+        <div class="code-row">
+          <input id="promo-input" class="promo-input" type="text" maxlength="24"
+                 autocomplete="off" autocapitalize="characters" spellcheck="false"
+                 placeholder="ВВЕДИТЕ КОД">
+          <button class="btn btn-primary code-btn" id="promo-btn">ОК</button>
+        </div>
+        <div class="code-status" id="code-status">Промокоды дают неоны, скины и читы</div>
+        <div class="code-hints">
+          <b>ГДЕ ИСКАТЬ КОДЫ</b>
+          <p>Промокоды публикуются в README проекта. Секретные коды спрятаны в подсказках и названиях предметов.</p>
+          <p class="code-example">Попробуйте: <span>NEON2026</span></p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- СЕТЕВАЯ ИГРА -->
