@@ -29,6 +29,7 @@ import time
 import traceback
 import tkinter as tk
 from collections import deque
+from datetime import date, timedelta
 
 try:                     # звук есть только на Windows
     import winsound
@@ -82,6 +83,65 @@ MODES = (
 )
 MODE_NAMES = {m[0]: m[1] for m in MODES}
 MODE_DESC = {m[0]: m[2] for m in MODES}
+
+# ---------------------------------------------------------------- магазин
+SKINS = (
+    {"id": "classic", "name": "НЕОН", "desc": "Фирменный бирюзовый градиент",
+     "price": 0, "colors": (HEAD_C, MID_C, TAIL_C)},
+    {"id": "magma", "name": "МАГМА", "desc": "Раскалённый закат",
+     "price": 600, "colors": ("#ffe0a8", "#ff8a3d", "#b51b4b")},
+    {"id": "toxic", "name": "ТОКСИН", "desc": "Кислотный лайм",
+     "price": 800, "colors": ("#eaffb0", "#8dff4d", "#1fbf6b")},
+    {"id": "ice", "name": "ЛЁД", "desc": "Ледяная сталь",
+     "price": 900, "colors": ("#ffffff", "#9fe8ff", "#4a7dff")},
+    {"id": "royal", "name": "ЗОЛОТО", "desc": "Королевский металл",
+     "price": 1200, "colors": ("#fff4c2", "#ffd24a", "#b0720e")},
+    {"id": "void", "name": "ПУСТОТА", "desc": "Фиолетовая бездна",
+     "price": 1500, "colors": ("#e3c8ff", "#b06bff", "#3d1a7a")},
+    {"id": "pixel", "name": "ПИКСЕЛЬ", "desc": "Ретро-аркадный неон",
+     "price": 1800, "colors": ("#c8ff8a", "#39ff88", "#0e7a5a")},
+    {"id": "rainbow", "name": "РАДУГА", "desc": "Переливается прямо в игре",
+     "price": 2500, "colors": ("#ff9ad0", "#ffd24a", "#39ff88"),
+     "special": "rainbow"},
+)
+SKIN_BY_ID = {s["id"]: s for s in SKINS}
+RAINBOW_PALETTES = (
+    ("#ff9ad0", "#ff4d9d", "#8f2a66"),
+    ("#ffe9a0", "#ffb347", "#7a4a16"),
+    ("#eaffb0", "#8dff4d", "#1fbf6b"),
+    ("#c8f7ff", "#3fd0ff", "#4a7dff"),
+    ("#e3c8ff", "#b06bff", "#5a2a9a"),
+    ("#ffd0dd", "#ff4d9d", "#b06bff"),
+)
+
+CHEATS = (
+    {"id": "ghost", "name": "ФАНТОМ", "chip": "ФАНТОМ", "price": 2200,
+     "desc": "Проходить сквозь стены, метеориты и соперников."},
+    {"id": "x2", "name": "ДВОЙНЫЕ ОЧКИ", "chip": "×2", "price": 2600,
+     "desc": "Все очки удваиваются, включая сетевую игру."},
+    {"id": "revive", "name": "ВТОРОЙ ШАНС", "chip": "ШАНС", "price": 2400,
+     "desc": "Одно автоматическое возрождение за игру."},
+    {"id": "lucky", "name": "ЗВЕЗДОПАД", "chip": "ЗВЁЗДЫ", "price": 1800,
+     "desc": "Золотые звёзды появляются заметно чаще."},
+    {"id": "rich", "name": "ЗОЛОТАЯ ЖИЛА", "chip": "+50%", "price": 2000,
+     "desc": "+50% неонов после каждой игры."},
+)
+CHEAT_BY_ID = {c["id"]: c for c in CHEATS}
+
+PROMO_CODES = {
+    "NEON2026": {"coins": 500},
+    "SNAKE777": {"coins": 777},
+    "NEONRICH": {"coins": 1000},
+    "GOLDSTAR": {"skin": "royal"},
+    "HAPPYSNAKE": {"coins": 300, "skin": "toxic"},
+    "PIXELPOWER": {"skin": "pixel"},
+    "RAINBOWCODE": {"skin": "rainbow"},
+    "GHOSTMODE": {"cheat": "ghost"},
+    "DOUBLEUP": {"cheat": "x2"},
+    "SECONDSHOT": {"cheat": "revive"},
+    "LUCKYSTAR": {"cheat": "lucky"},
+    "GOLDDIGGER": {"cheat": "rich"},
+}
 
 NET_PORT = 45871
 NET_MATCH_TIME = 90.0
@@ -165,6 +225,27 @@ def rr_pts(x0, y0, x1, y1, r, steps=4):
             a = math.radians(start + 90.0 * k / steps)
             pts.extend((cx + math.cos(a) * r, cy + math.sin(a) * r))
     return pts
+
+
+def valid_skin_id(value):
+    return value if value in SKIN_BY_ID else "classic"
+
+
+def default_cheat_flags():
+    return {c["id"]: False for c in CHEATS}
+
+
+def valid_cheat_ids(values):
+    out = []
+    if isinstance(values, list):
+        for value in values:
+            if value in CHEAT_BY_ID and value not in out:
+                out.append(value)
+    return out
+
+
+def date_key(offset_days=0):
+    return (date.today() + timedelta(days=offset_days)).isoformat()
 
 
 # ---------------------------------------------------------------- журнал ошибок
@@ -429,13 +510,17 @@ class Game:
         self.time = 0.0
         self.last = time.perf_counter()
 
-        self.settings, self.bests, self.mode = self._load_save()
+        self.settings, self.bests, self.mode, self.eco = self._load_save()
         self.menu_sel = 0
         self.modes_sel = [m[0] for m in MODES].index(self.mode)
         self.settings_sel = 0
         self.reset_confirm = False
         self.death_reason = "crash"
         self.state = "menu"
+        self.shop_tab = 0
+        self.shop_sel = 0
+        self.shop_status = ""
+        self.shop_status_color = MUTED
 
         # --- сеть ---
         self.net = None
@@ -489,6 +574,15 @@ class Game:
         settings = dict(DEFAULT_SETTINGS)
         bests = {m[0]: 0 for m in MODES}
         mode = "classic"
+        eco = {
+            "coins": 0,
+            "skin": "classic",
+            "skins": ["classic"],
+            "ownedCheats": [],
+            "cheats": default_cheat_flags(),
+            "usedCodes": [],
+            "daily": {"last": "", "streak": 0},
+        }
         try:
             with open(self._save_path(), "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -502,6 +596,45 @@ class Game:
                     except (TypeError, ValueError):
                         pass
             mode = data.get("mode", mode)
+
+            coins = data.get("coins", 0)
+            try:
+                eco["coins"] = max(0, int(coins))
+            except (TypeError, ValueError):
+                eco["coins"] = 0
+            skin = valid_skin_id(data.get("skin"))
+            skins = ["classic"]
+            saved_skins = data.get("skins")
+            if isinstance(saved_skins, list):
+                for item in saved_skins:
+                    if item in SKIN_BY_ID and item not in skins:
+                        skins.append(item)
+            if skin not in skins:
+                skin = "classic"
+            eco["skin"] = skin
+            eco["skins"] = skins
+            eco["ownedCheats"] = valid_cheat_ids(data.get("ownedCheats"))
+            saved_cheats = data.get("cheats")
+            if isinstance(saved_cheats, dict):
+                for cid in eco["ownedCheats"]:
+                    eco["cheats"][cid] = bool(saved_cheats.get(cid))
+            saved_codes = data.get("usedCodes")
+            if isinstance(saved_codes, list):
+                for code in saved_codes:
+                    if isinstance(code, str) and 0 < len(code) <= 24:
+                        code = code.upper()
+                        if code not in eco["usedCodes"]:
+                            eco["usedCodes"].append(code)
+            daily = data.get("daily")
+            if isinstance(daily, dict):
+                last = daily.get("last")
+                if isinstance(last, str):
+                    eco["daily"]["last"] = last[:10]
+                try:
+                    streak = int(daily.get("streak", 0))
+                    eco["daily"]["streak"] = max(0, min(7, streak))
+                except (TypeError, ValueError):
+                    pass
         except Exception:
             pass
 
@@ -524,7 +657,7 @@ class Game:
         settings["wrap"] = bool(settings.get("wrap"))
         for k in ("grid", "particles", "shake", "sound"):
             settings[k] = bool(settings.get(k, DEFAULT_SETTINGS[k]))
-        return settings, bests, mode
+        return settings, bests, mode, eco
 
     @property
     def best(self):
@@ -534,9 +667,220 @@ class Game:
         try:
             with open(self._save_path(), "w", encoding="utf-8") as f:
                 json.dump({"settings": self.settings, "best": self.bests,
-                           "mode": self.mode}, f, ensure_ascii=False, indent=1)
+                           "mode": self.mode,
+                           "coins": self.eco["coins"],
+                           "skin": self.eco["skin"],
+                           "skins": self.eco["skins"],
+                           "ownedCheats": self.eco["ownedCheats"],
+                           "cheats": self.eco["cheats"],
+                           "usedCodes": self.eco["usedCodes"],
+                           "daily": self.eco["daily"]},
+                          f, ensure_ascii=False, indent=1)
         except Exception:
             pass
+
+    # ------------------------------------------------ экономика и магазин
+    def active_cheat_ids(self):
+        return [c["id"] for c in CHEATS
+                if c["id"] in self.eco["ownedCheats"]
+                and self.eco["cheats"].get(c["id"])]
+
+    def cheat_flags(self):
+        flags = default_cheat_flags()
+        for cid in self.active_cheat_ids():
+            flags[cid] = True
+        return flags
+
+    def _cheat_payload(self, flags=None):
+        source = self.cheats if flags is None else flags
+        return {c["id"]: bool(source.get(c["id"])) for c in CHEATS}
+
+    def _skin_palette(self, skin_id, t=0.0):
+        skin = SKIN_BY_ID.get(valid_skin_id(skin_id))
+        if not skin:
+            skin = SKINS[0]
+        if skin.get("special") == "rainbow":
+            return RAINBOW_PALETTES[int(t * 1.7) % len(RAINBOW_PALETTES)]
+        return skin["colors"]
+
+    def add_coins(self, amount):
+        try:
+            value = int(round(float(amount)))
+        except (TypeError, ValueError):
+            value = 0
+        if value <= 0:
+            return 0
+        self.eco["coins"] += value
+        self.save_game()
+        return value
+
+    def daily_status(self):
+        today = date_key()
+        yesterday = date_key(-1)
+        daily = self.eco["daily"]
+        claimed = daily.get("last") == today
+        if claimed:
+            next_streak = max(1, int(daily.get("streak", 1)))
+        elif daily.get("last") == yesterday:
+            next_streak = min(7, int(daily.get("streak", 0)) + 1)
+        else:
+            next_streak = 1
+        return {
+            "claimed": claimed,
+            "streak": int(daily.get("streak", 0)),
+            "next": next_streak,
+            "reward": 40 + (next_streak - 1) * 10,
+        }
+
+    def claim_daily(self):
+        daily = self.daily_status()
+        if daily["claimed"]:
+            self._shop_note("БОНУС УЖЕ ПОЛУЧЕН СЕГОДНЯ", MUTED)
+            return
+        self.eco["daily"] = {"last": date_key(), "streak": daily["next"]}
+        self.add_coins(daily["reward"])
+        self.save_game()
+        self.play_sound("special")
+        self._shop_note("ЕЖЕДНЕВНЫЙ БОНУС +%d ◆" % daily["reward"], GOLD)
+
+    def open_shop(self):
+        self.stop_net()
+        self.shop_tab = 0
+        self.shop_sel = 0
+        self.shop_status = ""
+        self.state = "shop"
+        self.play_sound("menu")
+
+    def _shop_note(self, text, color=None):
+        self.shop_status = text
+        self.shop_status_color = color or CYAN
+
+    def _shop_item_count(self):
+        if self.shop_tab == 0:
+            return len(SKINS)
+        if self.shop_tab == 1:
+            return len(CHEATS)
+        return 1
+
+    def _shop_action(self):
+        if self.shop_tab == 0:
+            self._buy_skin(SKINS[self.shop_sel])
+        elif self.shop_tab == 1:
+            self._buy_cheat(CHEATS[self.shop_sel])
+        else:
+            self._prompt_code()
+
+    def _buy_skin(self, skin):
+        sid = skin["id"]
+        if sid in self.eco["skins"]:
+            self.eco["skin"] = sid
+            self.save_game()
+            self._shop_note("СКИН ВЫБРАН: " + skin["name"], CYAN)
+            self.play_sound("menu")
+            return
+        if self.eco["coins"] < skin["price"]:
+            self._shop_note("НЕ ХВАТАЕТ %d ◆" %
+                            (skin["price"] - self.eco["coins"]), MAGENTA)
+            self.play_sound("die")
+            return
+        self.eco["coins"] -= skin["price"]
+        self.eco["skins"].append(sid)
+        self.eco["skin"] = sid
+        self.save_game()
+        self._shop_note("КУПЛЕНО: " + skin["name"], GOLD)
+        self.play_sound("special")
+
+    def _buy_cheat(self, cheat):
+        cid = cheat["id"]
+        if cid in self.eco["ownedCheats"]:
+            self.eco["cheats"][cid] = not bool(self.eco["cheats"].get(cid))
+            self.save_game()
+            self._shop_note(("ЧИТ ВКЛЮЧЁН: " if self.eco["cheats"][cid]
+                             else "ЧИТ ВЫКЛЮЧЕН: ") + cheat["name"],
+                            GOLD if self.eco["cheats"][cid] else MUTED)
+            self.play_sound("menu")
+            return
+        if self.eco["coins"] < cheat["price"]:
+            self._shop_note("НЕ ХВАТАЕТ %d ◆" %
+                            (cheat["price"] - self.eco["coins"]), MAGENTA)
+            self.play_sound("die")
+            return
+        self.eco["coins"] -= cheat["price"]
+        self.eco["ownedCheats"].append(cid)
+        self.eco["cheats"][cid] = True
+        self.save_game()
+        self._shop_note("ЧИТ ОТКРЫТ: " + cheat["name"], GOLD)
+        self.play_sound("special")
+
+    def _prompt_code(self):
+        from tkinter import simpledialog
+        value = simpledialog.askstring(
+            "ПРОМОКОД", "Введите промокод или секретный код:",
+            parent=self.root)
+        if value is None:
+            return
+        code = "".join(ch for ch in str(value).upper() if ch.isalnum())[:24]
+        if len(code) < 3:
+            self._shop_note("ВВЕДИТЕ КОД", MAGENTA)
+            return
+        if code in self.eco["usedCodes"]:
+            self._shop_note("ЭТОТ КОД УЖЕ ИСПОЛЬЗОВАН", MAGENTA)
+            return
+        promo = PROMO_CODES.get(code)
+        if not promo:
+            self._shop_note("НЕВЕРНЫЙ КОД: " + code, MAGENTA)
+            self.play_sound("die")
+            return
+        rewards = []
+        coins_gain = int(promo.get("coins", 0))
+        skin_id = promo.get("skin")
+        if skin_id and skin_id in SKIN_BY_ID:
+            skin = SKIN_BY_ID[skin_id]
+            if skin_id in self.eco["skins"]:
+                extra = max(50, skin["price"] // 2)
+                coins_gain += extra
+                rewards.append("КОМПЕНСАЦИЯ %d ◆" % extra)
+            else:
+                self.eco["skins"].append(skin_id)
+                rewards.append("СКИН " + skin["name"])
+        cheat_id = promo.get("cheat")
+        if cheat_id and cheat_id in CHEAT_BY_ID:
+            cheat = CHEAT_BY_ID[cheat_id]
+            if cheat_id in self.eco["ownedCheats"]:
+                extra = max(50, cheat["price"] // 2)
+                coins_gain += extra
+                rewards.append("КОМПЕНСАЦИЯ %d ◆" % extra)
+            else:
+                self.eco["ownedCheats"].append(cheat_id)
+                self.eco["cheats"][cheat_id] = True
+                rewards.append("ЧИТ " + cheat["name"])
+        if coins_gain:
+            self.eco["coins"] += coins_gain
+            rewards.insert(0, "+%d ◆" % coins_gain)
+        self.eco["usedCodes"].append(code)
+        self.save_game()
+        self._shop_note("КОД АКТИВИРОВАН: " + " · ".join(rewards), GOLD)
+        self.play_sound("special")
+
+    def grant_coins(self):
+        if getattr(self, "rewarded", False):
+            return
+        self.rewarded = True
+        base = (int(self.score) // 5 + self.apples * 3 +
+                self.stars * 6 + self.powers * 4)
+        record_bonus = 150 if self.new_record else 0
+        net_bonus = 0
+        if self.mode == "net":
+            net_bonus = 15
+            my_winner = 2 if self.net_role == "client" else 1
+            if self.net_winner == my_winner:
+                net_bonus += 30
+        total = max(1, int(round(
+            (base + record_bonus + net_bonus) * self.coin_mult)))
+        self.reward_coins = total
+        self.reward_record_bonus = record_bonus
+        self.eco["coins"] += total
+        self.save_game()
 
     def play_sound(self, kind):
         if not self.settings.get("sound") or winsound is None:
@@ -571,6 +915,14 @@ class Game:
             self.min_int *= 0.94
         self.interval = self.base_int
         self.power_every = POWER_EVERY.get(self.mode, 4)
+        self.cheats = self.cheat_flags()
+        self.score_mult = 2 if self.cheats.get("x2") else 1
+        self.revives = 1 if self.cheats.get("revive") else 0
+        self.coin_mult = 1.5 if self.cheats.get("rich") else 1.0
+        special_every = SPECIAL_EVERY.get(self.settings.get("specials"), 4)
+        if self.cheats.get("lucky"):
+            special_every = max(2, special_every - 2)
+        self.special_every = special_every
 
         cy = ROWS // 2
         cx = COLS // 2
@@ -605,6 +957,10 @@ class Game:
         self.shake = 0.0
         self.dead_at = 0.0
         self.new_record = False
+        self.rewarded = False
+        self.reward_coins = 0
+        self.reward_record_bonus = 0
+        self.player_skin = self.eco["skin"]
         if self.mode == "blitz":
             self.time_left = 60.0
         elif self.mode == "net":
@@ -619,8 +975,7 @@ class Game:
         if self.mode == "bots":
             self._spawn_bots()
         elif self.mode == "net":
-            self.player_colors = (NET_GUEST_COLORS if self.net_role == "client"
-                                  else NET_HOST_COLORS)
+            self.player_colors = self._skin_palette(self.player_skin, self.time)
             if self.net_role == "host":
                 self._spawn_net_guest()
         self.food = None
@@ -743,6 +1098,8 @@ class Game:
         self.acc = 0.0
         if self.net_role == "host":
             self._net_host_send(0.0, force=True)
+        else:
+            self._net_send_loadout()
         self.play_sound("menu")
 
     def stop_net(self):
@@ -870,7 +1227,8 @@ class Game:
         return {"name": name, "colors": colors, "body": list(body),
                 "prev": list(body), "dir": direction, "queue": [],
                 "score": 0, "alive": True, "respawn": 0.0, "ai": True,
-                "apples": 0, "stars": 0, "powers": 0}
+                "apples": 0, "stars": 0, "powers": 0,
+                "skin": None, "cheats": default_cheat_flags(), "revives": 0}
 
     def _spawn_bots(self):
         cy = ROWS // 2
@@ -937,6 +1295,18 @@ class Game:
     def _kill_rival(self, rival, reason="crash"):
         if not rival["alive"]:
             return
+        if self.mode == "net" and rival.get("revives", 0) > 0:
+            rival["revives"] -= 1
+            old_body = rival["body"]
+            rival["alive"] = False
+            rival["body"] = []
+            if self._respawn_rival(rival):
+                x, y = self._center_of(rival["body"][0])
+                self.rings.append(Ring(x, y, GOLD, rmax=52, ttl=0.5))
+                self.floats.append(FloatText(x, y - 14, "ВТОРОЙ ШАНС!", GOLD))
+                self.play_sound("special")
+                return
+            rival["body"] = old_body
         rival["alive"] = False
         rival["respawn"] = 2.6 if self.mode == "bots" else 0.0
         x, y = self._center_of(rival["body"][0])
@@ -959,9 +1329,12 @@ class Game:
             rival["dir"] = rival["queue"].pop(0)
         dx, dy = rival["dir"]
         head = (rival["body"][0][0] + dx, rival["body"][0][1] + dy)
+        cheats = rival.get("cheats") or {}
+        ghost = bool(cheats.get("ghost"))
+        score_mult = 2 if cheats.get("x2") else 1
 
         outside = not (0 <= head[0] < COLS and 0 <= head[1] < ROWS)
-        if outside and self.wrap:
+        if outside and (self.wrap or ghost):
             head = (head[0] % COLS, head[1] % ROWS)
             outside = False
 
@@ -969,9 +1342,11 @@ class Game:
         eat_special = self.special is not None and head == self.special["pos"]
         eat_power = self.powerup is not None and head == self.powerup["pos"]
         body = rival["body"] if eat else rival["body"][:-1]
-        blocked = (head in body or head in self.walls or head in self.meteors
-                   or head in self.snake or head in self._other_rival_cells(rival))
-        if outside or blocked:
+        body_blocked = head in body
+        world_blocked = (head in self.walls or head in self.meteors
+                         or head in self.snake
+                         or head in self._other_rival_cells(rival))
+        if outside or body_blocked or (world_blocked and not ghost):
             self._kill_rival(rival)
             return
 
@@ -982,20 +1357,20 @@ class Game:
 
         x, y = self._center_of(head)
         if eat:
-            rival["score"] += 10
+            rival["score"] += 10 * score_mult
             rival["apples"] += 1
             self._new_food()
             if self.settings.get("particles"):
                 for _ in range(7):
                     self.particles.append(Particle(x, y, rival["colors"][1]))
         if eat_special:
-            rival["score"] += 30
+            rival["score"] += 30 * score_mult
             rival["stars"] += 1
             self.special = None
             if self.settings.get("particles"):
                 self.rings.append(Ring(x, y, GOLD, rmax=40))
         if eat_power:
-            rival["score"] += 15
+            rival["score"] += 15 * score_mult
             rival["powers"] += 1
             self.powerup = None
             if self.settings.get("particles"):
@@ -1126,6 +1501,29 @@ class Game:
                     rival["queue"].append(d)
                 return
 
+    def _net_send_loadout(self):
+        if self.net is not None and self.net_role == "client":
+            self.net.send({"t": "loadout", "sk": self.player_skin,
+                           "ch": self._cheat_payload()})
+
+    def _net_apply_loadout(self, msg):
+        if self.net_role != "host" or not self.rivals:
+            return
+        rival = self.rivals[0]
+        skin = valid_skin_id(msg.get("sk"))
+        flags = default_cheat_flags()
+        raw = msg.get("ch")
+        if isinstance(raw, dict):
+            for cid in flags:
+                flags[cid] = bool(raw.get(cid))
+        rival["skin"] = skin
+        rival["colors"] = self._skin_palette(skin, self.time)
+        rival["cheats"] = flags
+        rival["revives"] = 1 if flags.get("revive") else 0
+        base = SPECIAL_EVERY.get(self.settings.get("specials"), 4)
+        if flags.get("lucky"):
+            self.special_every = min(self.special_every, max(2, base - 2))
+
     def _net_snake_state(self):
         if self.rivals:
             guest = self.rivals[0]
@@ -1133,10 +1531,13 @@ class Game:
                   "pv": [list(c) for c in guest["prev"]],
                   "d": list(guest["dir"]), "s": guest["score"],
                   "a": guest["apples"], "st": guest["stars"],
-                  "pw": guest["powers"]}
+                  "pw": guest["powers"],
+                  "sk": guest.get("skin") or "classic",
+                  "ch": self._cheat_payload(guest.get("cheats") or {})}
         else:
             p2 = {"b": [], "pv": [], "d": [1, 0], "s": 0,
-                  "a": 0, "st": 0, "pw": 0}
+                  "a": 0, "st": 0, "pw": 0,
+                  "sk": "classic", "ch": default_cheat_flags()}
         return p2
 
     def _net_host_send(self, dt, force=False):
@@ -1150,7 +1551,9 @@ class Game:
             "t": "state",
             "p1": {"b": [list(c) for c in self.snake],
                    "pv": [list(c) for c in self.prev_snake],
-                   "d": list(self.dir), "s": self.score},
+                   "d": list(self.dir), "s": self.score,
+                   "sk": self.player_skin,
+                   "ch": self._cheat_payload()},
             "p2": self._net_snake_state(),
             "food": list(self.food) if self.food else None,
             "sp": ({"pos": list(self.special["pos"]),
@@ -1183,8 +1586,15 @@ class Game:
         p1 = msg.get("p1") or {}
         host_body = [tuple(c) for c in (p1.get("b") or []) if len(c) == 2]
         host_prev = [tuple(c) for c in (p1.get("pv") or []) if len(c) == 2]
+        host_skin = valid_skin_id(p1.get("sk") or "classic")
+        host_flags = default_cheat_flags()
+        raw_flags = p1.get("ch")
+        if isinstance(raw_flags, dict):
+            for cid in host_flags:
+                host_flags[cid] = bool(raw_flags.get(cid))
+        host_colors = self._skin_palette(host_skin, self.time)
         if not self.rivals:
-            rival = self._make_rival("ХОСТ", NET_HOST_COLORS, host_body or [],
+            rival = self._make_rival("ХОСТ", host_colors, host_body or [],
                                      tuple(p1.get("d") or (1, 0)))
             rival["ai"] = False
             self.rivals = [rival]
@@ -1194,6 +1604,10 @@ class Game:
             rival["prev"] = host_prev or list(host_body)
         rival["dir"] = tuple(p1.get("d") or rival["dir"])
         rival["score"] = int(p1.get("s", rival["score"]))
+        rival["skin"] = host_skin
+        rival["colors"] = host_colors
+        rival["cheats"] = host_flags
+        rival["revives"] = 1 if host_flags.get("revive") else 0
 
         self.food = tuple(msg["food"]) if msg.get("food") else None
         sp = msg.get("sp")
@@ -1270,6 +1684,8 @@ class Game:
             kind = msg.get("t")
             if kind == "input" and self.net_role == "host":
                 self._net_apply_input(msg)
+            elif kind == "loadout" and self.net_role == "host":
+                self._net_apply_loadout(msg)
             elif kind == "state" and self.net_role == "client":
                 self._apply_net_state(msg)
             elif kind == "over" and self.net_role == "client":
@@ -1416,7 +1832,8 @@ class Game:
 
         outside = not (0 <= head[0] < COLS and 0 <= head[1] < ROWS)
         invincible = self.effects.get("shield", 0.0) > 0.0
-        if outside and (self.wrap or invincible):
+        ghost = bool(self.cheats.get("ghost"))
+        if outside and (self.wrap or invincible or ghost):
             head = (head[0] % COLS, head[1] % ROWS)
             outside = False
 
@@ -1426,9 +1843,11 @@ class Game:
         grow = (1 if eat_normal else 0) + (2 if eat_special else 0)
 
         body = self.snake if grow else self.snake[:-1]
-        blocked = (head in body or head in self.walls or head in self.meteors
-                   or head in self._rival_cells())
-        if outside or (blocked and not invincible):
+        body_blocked = head in body
+        world_blocked = (head in self.walls or head in self.meteors
+                         or head in self._rival_cells())
+        if outside or (body_blocked and not invincible) or \
+                (world_blocked and not invincible and not ghost):
             self.die()
             return
 
@@ -1463,12 +1882,12 @@ class Game:
         self.combo_timer = 2.5 if self.mode in ("blitz", "chaos") else 3.0
         self.max_combo = max(self.max_combo, self.combo)
         mult = 2 if self.effects.get("double", 0.0) > 0.0 else 1
-        gain = 10 * self.combo * mult
+        gain = 10 * self.combo * mult * self.score_mult
         self.score += gain
         self.score_pulse = 1.0
         self.apples += 1
         self._new_food()
-        every = SPECIAL_EVERY.get(self.settings.get("specials"), 4)
+        every = self.special_every
         if self.apples % every == 0 and self.special is None:
             self._new_special()
         if self.mode != "net" and self.apples % self.power_every == 0 \
@@ -1482,7 +1901,7 @@ class Game:
 
     def _eat_special(self, cell):
         mult = 2 if self.effects.get("double", 0.0) > 0.0 else 1
-        gain = 30 * max(1, self.combo) * mult
+        gain = 30 * max(1, self.combo) * mult * self.score_mult
         self.score += gain
         self.score_pulse = 1.0
         self.stars += 1
@@ -1499,14 +1918,15 @@ class Game:
         self.powerup = None
         dur = POWER_DURATION.get(kind, 8.0)
         self.effects[kind] = max(self.effects.get(kind, 0.0), dur)
-        self.score += 15
+        gain = 15 * self.score_mult
+        self.score += gain
         self.score_pulse = 1.0
         self.powers += 1
         color = EFFECT_INFO[kind][1]
         if self.settings.get("shake"):
             self.shake = max(self.shake, 3.0)
         self.pending_eats.append({"cell": cell, "color": color,
-                                  "text": POWER_TEXT.get(kind, "БОНУС") + "  +15",
+                                  "text": POWER_TEXT.get(kind, "БОНУС") + "  +%d" % gain,
                                   "tcolor": mix(color, "#ffffff", 0.45),
                                   "delay": self.interval, "special": False,
                                   "pkind": kind})
@@ -1575,9 +1995,50 @@ class Game:
         for _ in range(10):
             self.particles.append(Particle(x, y, color))
 
+    def _respawn_player(self):
+        cells = self._free_cells()
+        random.shuffle(cells)
+        for cell in cells:
+            for d in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                body = []
+                ok = True
+                for i in range(4):
+                    c = (cell[0] - d[0] * i, cell[1] - d[1] * i)
+                    if self.wrap:
+                        c = (c[0] % COLS, c[1] % ROWS)
+                    elif not (0 <= c[0] < COLS and 0 <= c[1] < ROWS):
+                        ok = False
+                        break
+                    if c in self.walls or c in self.meteors or \
+                            c in self._rival_cells():
+                        ok = False
+                        break
+                    body.append(c)
+                if ok:
+                    self.snake = body
+                    self.prev_snake = list(body)
+                    self.dir = d
+                    self.queue = []
+                    return True
+        return False
+
     def die(self, reason="crash"):
         if self.state != "playing":
             return
+        if self.revives > 0:
+            self.revives -= 1
+            if self._respawn_player():
+                self.combo = 1
+                self.combo_timer = 0.0
+                self.acc = 0.0
+                self.t_render = 0.0
+                self.queue = []
+                x, y = self._center_of(self.snake[0])
+                self.rings.append(Ring(x, y, GOLD, rmax=60, ttl=0.6))
+                self.floats.append(FloatText(x, y - 18, "ВТОРОЙ ШАНС!", GOLD))
+                self.flash = 0.7
+                self.play_sound("special")
+                return
         self.state = "dead"
         self.death_reason = reason
         self.dead_at = self.time
@@ -1603,9 +2064,10 @@ class Game:
             self._eating_fx(pe["cell"], pe["color"], pe["text"], pe["tcolor"])
         self.pending_eats = []
 
-        self._commit_best()
         if self.mode == "net" and self.net_role == "host":
             self._net_end(2, reason)
+        else:
+            self._commit_best()
         self.play_sound("die")
 
     def _commit_best(self):
@@ -1615,6 +2077,7 @@ class Game:
             self.save_game()
         else:
             self.new_record = False
+        self.grant_coins()
 
     # ------------------------------------------------ ввод
     def on_key(self, e):
@@ -1627,10 +2090,10 @@ class Game:
 
         if self.state == "menu":
             if up:
-                self.menu_sel = (self.menu_sel - 1) % 4
+                self.menu_sel = (self.menu_sel - 1) % 5
                 self.play_sound("menu")
             elif down:
-                self.menu_sel = (self.menu_sel + 1) % 4
+                self.menu_sel = (self.menu_sel + 1) % 5
                 self.play_sound("menu")
             elif enter:
                 self._menu_action()
@@ -1669,6 +2132,31 @@ class Game:
                 self.state = "netmenu"
                 self.net_status = ""
                 self.play_sound("menu")
+
+        elif self.state == "shop":
+            count = self._shop_item_count()
+            if ks in ("d", "в"):
+                self.claim_daily()
+            elif left:
+                self.shop_tab = (self.shop_tab - 1) % 3
+                self.shop_sel = 0
+                self.shop_status = ""
+                self.play_sound("menu")
+            elif right:
+                self.shop_tab = (self.shop_tab + 1) % 3
+                self.shop_sel = 0
+                self.shop_status = ""
+                self.play_sound("menu")
+            elif up:
+                self.shop_sel = (self.shop_sel - 1) % count
+                self.play_sound("menu")
+            elif down:
+                self.shop_sel = (self.shop_sel + 1) % count
+                self.play_sound("menu")
+            elif enter:
+                self._shop_action()
+            elif ks == "escape":
+                self.back_to_menu()
 
         elif self.state == "settings":
             rows = len(SETTING_ROWS) + 2
@@ -1745,6 +2233,8 @@ class Game:
         elif self.menu_sel == 1:
             self.open_modes()
         elif self.menu_sel == 2:
+            self.open_shop()
+        elif self.menu_sel == 3:
             self.open_settings()
         else:
             self.close()
@@ -1953,16 +2443,22 @@ class Game:
                     fill=mix(ORANGE, "#fff1d6", 0.55), outline="")
 
     def draw_snake(self, ox, oy, t):
-        palette = self.player_colors or (HEAD_C, MID_C, TAIL_C)
-        label = "ТЫ" if self.mode in ("bots", "net") else None
+        palette = self._skin_palette(self.player_skin, self.time)
+        if self.mode in ("bots", "net"):
+            label = "ТЫ"
+        else:
+            label = None
         self._draw_snake(self.snake, self.prev_snake, self.dir,
                          palette, ox, oy, t, label)
 
     def draw_rivals(self, ox, oy, t):
         for rival in self.rivals:
             if rival["alive"] and rival["body"]:
+                skin = rival.get("skin")
+                palette = (self._skin_palette(skin, self.time)
+                           if skin else rival["colors"])
                 self._draw_snake(rival["body"], rival["prev"], rival["dir"],
-                                 rival["colors"], ox, oy, t, rival["name"])
+                                 palette, ox, oy, t, rival["name"])
 
     def _draw_snake(self, body, prev_body, direction, palette, ox, oy, t, label=None):
         if not body:
@@ -2118,6 +2614,8 @@ class Game:
                 "%s %d" % (r["name"], r["score"]) for r in self.rivals)
         self._t(62, 4, text=title, anchor="nw",
                 font=(F_UI, 8, "bold"), fill="#3f6384")
+        self._t(738, 4, text="◆ %d" % self.eco["coins"], anchor="ne",
+                font=(F_UI, 9, "bold"), fill=GOLD)
 
         if self.mode == "blitz":
             third_label = "ВРЕМЯ"
@@ -2179,6 +2677,13 @@ class Game:
                         fill=MAGENTA, outline="", smooth=False)
 
         self._draw_effects()
+        active = self.active_cheat_ids()
+        if active:
+            self._t(738, 86,
+                    text="ЧИТЫ · " + " · ".join(CHEAT_BY_ID[c]["chip"]
+                                                for c in active),
+                    anchor="e", font=(F_UI, 7, "bold"),
+                    fill=mix(VIOLET, "#ffffff", 0.25))
 
     def _draw_effects(self):
         active = [(k, v) for k, v in self.effects.items() if v > 0.01]
@@ -2236,6 +2741,8 @@ class Game:
             self.draw_menu()
         elif self.state == "modes":
             self.draw_modes()
+        elif self.state == "shop":
+            self.draw_shop()
         elif self.state == "settings":
             self.draw_settings()
         elif self.state == "paused":
@@ -2292,6 +2799,175 @@ class Game:
         self.rrect(x0, y0, x1, y1, 12, fill=fill, outline=outline, width=2)
         self._t(cx, cy, text=label, font=(F_UI, 12, "bold"), fill=text_col)
 
+    # ------------------------------------------------ магазин
+    def draw_shop(self):
+        x0, y0 = FX + 12, FY + 12
+        x1, y1 = FX + FIELD_W - 12, FY + FIELD_H - 12
+        self._panel(x0, y0, x1, y1, 24)
+        cx = (x0 + x1) / 2
+
+        self._t(x0 + 28, y0 + 30, text="МАГАЗИН НЕОНОВ", anchor="w",
+                font=(F_TITLE, 18, "bold"), fill=HEAD_C)
+
+        daily = self.daily_status()
+        if daily["claimed"]:
+            dtext, dcol = "БОНУС ДНЯ ПОЛУЧЕН", MUTED
+        else:
+            dtext = "БОНУС ДНЯ  +%d ◆  ·  D" % daily["reward"]
+            dcol = GOLD
+        self.rrect(x1 - 392, y0 + 14, x1 - 158, y0 + 42, 10,
+                   fill=mix(PANEL_BG, GOLD, 0.07),
+                   outline=mix("#2a2414", GOLD, 0.33))
+        self._t((x1 - 392 + x1 - 158) / 2, y0 + 28, text=dtext,
+                font=(F_UI, 8, "bold"), fill=dcol)
+
+        self.rrect(x1 - 150, y0 + 14, x1 - 16, y0 + 42, 10,
+                   fill=mix(PANEL_BG, GOLD, 0.12),
+                   outline=mix("#3a2c12", GOLD, 0.45))
+        self._t(x1 - 83, y0 + 28, text="◆ %d" % self.eco["coins"],
+                font=(F_TITLE, 13, "bold"), fill=GOLD)
+
+        tabs = ("СКИНЫ", "ЧИТЫ", "КОДЫ")
+        tw, th, gap = 150, 28, 10
+        total = len(tabs) * tw + (len(tabs) - 1) * gap
+        tx = cx - total / 2
+        for i, label in enumerate(tabs):
+            active = (i == self.shop_tab)
+            bx0 = tx + i * (tw + gap)
+            bx1 = bx0 + tw
+            self.rrect(bx0, y0 + 54, bx1, y0 + 54 + th, 9,
+                       fill=mix("#081220", CYAN, 0.16 if active else 0.03),
+                       outline=mix("#16304a", CYAN, 0.62 if active else 0.18),
+                       width=2 if active else 1)
+            self._t((bx0 + bx1) / 2, y0 + 68, text=label,
+                    font=(F_UI, 9, "bold"),
+                    fill="#c9f4ff" if active else "#5b7694")
+
+        if self.shop_tab == 0:
+            self._draw_shop_skins(x0, y0, x1)
+        elif self.shop_tab == 1:
+            self._draw_shop_cheats(x0, y0, x1)
+        else:
+            self._draw_shop_codes(cx, y0)
+
+        if self.shop_status:
+            self._t(cx, y0 + 448, text=self.shop_status,
+                    font=(F_UI, 9, "bold"), fill=self.shop_status_color)
+        self._t(cx, y0 + 472,
+                text="← → — раздел    ↑ ↓ — выбор    Enter — действие    "
+                     "D — бонус дня    Esc — меню",
+                font=(F_UI, 8), fill=MUTED)
+
+    def _draw_shop_skins(self, x0, y0, x1):
+        row_h = 38
+        top = y0 + 102
+        for i, skin in enumerate(SKINS):
+            ry0 = top + i * row_h
+            ry1 = ry0 + row_h - 5
+            selected = (i == self.shop_sel)
+            owned = skin["id"] in self.eco["skins"]
+            current = self.eco["skin"] == skin["id"]
+            self.rrect(x0 + 26, ry0, x1 - 26, ry1, 9,
+                       fill=mix("#081220", CYAN, 0.13 if selected else 0.03),
+                       outline=mix("#16304a", CYAN,
+                                   0.55 if selected else 0.12),
+                       width=2 if selected else 1)
+            head, mid, _tail = skin["colors"]
+            self.rrect(x0 + 38, ry0 + 9, x0 + 56, ry1 - 9, 5,
+                       fill=mid, outline=head)
+            self._t(x0 + 68, ry0 + 10, text=skin["name"], anchor="nw",
+                    font=(F_UI, 9, "bold"),
+                    fill="#e6fbff" if selected else "#a9c6dd")
+            self._t(x0 + 68, ry0 + 24, text=skin["desc"], anchor="nw",
+                    font=(F_UI, 7), fill="#4f6a8a")
+            if current:
+                state, col = "ВЫБРАН", CYAN
+            elif owned:
+                state, col = "ВЫБРАТЬ", MUTED
+            elif self.eco["coins"] >= skin["price"]:
+                state, col = "%d ◆" % skin["price"], GOLD
+            else:
+                state, col = "%d ◆" % skin["price"], "#8a6a6a"
+            self._t(x1 - 42, (ry0 + ry1) / 2, text=state, anchor="e",
+                    font=(F_UI, 9, "bold"), fill=col)
+
+    def _draw_shop_cheats(self, x0, y0, x1):
+        row_h = 50
+        top = y0 + 102
+        for i, cheat in enumerate(CHEATS):
+            ry0 = top + i * row_h
+            ry1 = ry0 + row_h - 6
+            selected = (i == self.shop_sel)
+            owned = cheat["id"] in self.eco["ownedCheats"]
+            enabled = owned and self.eco["cheats"].get(cheat["id"])
+            hot = GOLD if enabled else CYAN
+            self.rrect(x0 + 26, ry0, x1 - 26, ry1, 9,
+                       fill=mix("#081220", hot, 0.12 if selected else 0.03),
+                       outline=mix("#16304a", hot,
+                                   0.55 if selected else 0.12),
+                       width=2 if selected else 1)
+            self.rrect(x0 + 38, ry0 + 10, x0 + 112, ry1 - 10, 7,
+                       fill=mix(PANEL_BG, hot, 0.18 if enabled else 0.07),
+                       outline=mix("#16304a", hot, 0.45 if enabled else 0.18))
+            self._t(x0 + 75, (ry0 + ry1) / 2, text=cheat["chip"],
+                    font=(F_UI, 8, "bold"),
+                    fill=GOLD if enabled else "#8fb2c9")
+            self._t(x0 + 124, ry0 + 9, text=cheat["name"], anchor="nw",
+                    font=(F_UI, 9, "bold"),
+                    fill="#e6fbff" if selected else "#a9c6dd")
+            self._t(x0 + 124, ry0 + 24, text=cheat["desc"], anchor="nw",
+                    font=(F_UI, 7), fill="#4f6a8a")
+            if not owned:
+                if self.eco["coins"] >= cheat["price"]:
+                    state, col = "%d ◆" % cheat["price"], GOLD
+                else:
+                    state, col = "%d ◆" % cheat["price"], "#8a6a6a"
+            elif enabled:
+                state, col = "ВКЛЮЧЁН", GOLD
+            else:
+                state, col = "ВЫКЛЮЧЕН", MUTED
+            self._t(x1 - 42, (ry0 + ry1) / 2, text=state, anchor="e",
+                    font=(F_UI, 9, "bold"), fill=col)
+        self._t((x0 + x1) / 2, y0 + 382,
+                text="Читы действуют во всех режимах, включая сетевую игру.",
+                font=(F_UI, 8, "italic"), fill="#4f6a8a")
+
+    def _draw_shop_codes(self, cx, y0):
+        card_x0, card_x1 = cx - 260, cx + 260
+        card_y0, card_y1 = y0 + 108, y0 + 396
+        self.rrect(card_x0, card_y0, card_x1, card_y1, 18,
+                   fill=mix(PANEL_BG, GOLD, 0.035),
+                   outline=mix("#233350", GOLD, 0.24), width=2)
+        self._glow_text(cx, card_y0 + 36, "ПРОМОКОДЫ", 22, GOLD, "#6a4310")
+
+        lines = (
+            "Введите промокод из README или секретный код из игры.",
+            "Код даёт неоны, скин или чит — один раз на сохранение.",
+            "Если предмет уже куплен, начислим компенсацию неонами.",
+        )
+        for i, line in enumerate(lines):
+            self._t(cx, card_y0 + 72 + i * 22, text=line,
+                    font=(F_UI, 9), fill="#6f86a1")
+
+        pulse = 0.5 + 0.5 * math.sin(self.time * 3.4)
+        self._button(cx, card_y0 + 166, 320, 40, "ENTER — ВВЕСТИ КОД", pulse)
+
+        used = len(self.eco["usedCodes"])
+        self._t(cx, card_y0 + 212, text="АКТИВИРОВАНО КОДОВ: %d" % used,
+                font=(F_TITLE, 11, "bold"), fill=CYAN)
+
+        daily = self.daily_status()
+        if daily["claimed"]:
+            line = "Бонус дня уже получен · серия %d" % daily["streak"]
+            col = MUTED
+        else:
+            line = "Бонус дня: +%d ◆ · нажмите D" % daily["reward"]
+            col = GOLD
+        self._t(cx, card_y0 + 244, text=line, font=(F_UI, 9, "bold"), fill=col)
+        self._t(cx, card_y0 + 268,
+                text="Серия растёт при ежедневном входе: 40 → 100 ◆",
+                font=(F_UI, 8), fill="#4f6a8a")
+
     # ------------------------------------------------ меню
     def draw_menu(self):
         x0, y0 = FX + 12, FY + 12
@@ -2305,24 +2981,34 @@ class Game:
         self._t(cx, y0 + 134, text="собирай свет — не врезайся в стены",
                 font=(F_UI, 10, "italic"), fill="#5f7d9e")
 
-        self._demo_snake(cx, y0 + 186)
+        coin_chip = "◆ %d" % self.eco["coins"]
+        self.rrect(x1 - 150, y0 + 14, x1 - 16, y0 + 42, 10,
+                   fill=mix(PANEL_BG, GOLD, 0.12),
+                   outline=mix("#3a2c12", GOLD, 0.45))
+        self._t(x1 - 83, y0 + 28, text=coin_chip,
+                font=(F_TITLE, 13, "bold"), fill=GOLD)
+
+        self._demo_snake(cx, y0 + 178)
 
         pulse = 0.5 + 0.5 * math.sin(self.time * 3.2)
-        labels = ("ИГРАТЬ", "МИНИ-ИГРЫ", "НАСТРОЙКИ", "ВЫХОД")
+        labels = ("ИГРАТЬ", "МИНИ-ИГРЫ", "МАГАЗИН", "НАСТРОЙКИ", "ВЫХОД")
         for i, label in enumerate(labels):
             selected = (i == self.menu_sel)
-            hot = MAGENTA if i == 3 else CYAN
-            self._button(cx, y0 + 244 + i * 46, 330, 38, label,
+            hot = MAGENTA if i == 4 else CYAN
+            self._button(cx, y0 + 228 + i * 42, 330, 34, label,
                          pulse if selected else 0.0, hot=hot,
                          active=selected)
 
-        self._t(cx, y0 + 438,
+        self._t(cx, y0 + 436,
                 text="РЕКОРД  ·  %s    %d" % (MODE_NAMES.get(self.mode, ""), self.best),
                 font=(F_TITLE, 13, "bold"), fill=GOLD)
-        self._t(cx, y0 + 463, text="↑ ↓ — выбор        Enter — открыть        Esc — выход",
+        skin_name = SKIN_BY_ID.get(self.eco["skin"], SKINS[0])["name"]
+        self._t(cx, y0 + 458,
+                text="СКИН: %s   ·   ЧИТЫ: %d" %
+                     (skin_name, len(self.active_cheat_ids())),
+                font=(F_UI, 8, "bold"), fill="#5f7d9e")
+        self._t(cx, y0 + 478, text="↑ ↓ — выбор        Enter — открыть        Esc — выход",
                 font=(F_UI, 9), fill=MUTED)
-        self._t(cx, y0 + 481, text="в игре: ← ↑ → ↓ / WASD, ПРОБЕЛ — пауза, R — заново",
-                font=(F_UI, 8), fill="#435572")
 
     def _demo_snake(self, cx, cy):
         n, gap = 15, 22
@@ -2610,6 +3296,11 @@ class Game:
                     font=(F_TITLE, 15, "bold"), fill=color)
 
         pulse = 0.5 + 0.5 * math.sin(self.time * 3.4)
+        if self.reward_coins:
+            extra = ("  ·  рекорд +%d" % self.reward_record_bonus
+                     if self.reward_record_bonus else "")
+            self._t(cx, y0 + 264, text="+%d ◆%s" % (self.reward_coins, extra),
+                    font=(F_UI, 10, "bold"), fill=GOLD)
         self._button(cx, y0 + 296, 300, 46, "ПРОБЕЛ — ЕЩЁ РАЗ", pulse)
         self._t(cx, y0 + 340, text="M — мини-игры      ESC — меню",
                 font=(F_UI, 9), fill=MUTED)
@@ -2655,6 +3346,9 @@ class Game:
                 font=(F_TITLE, 12, "bold"), fill=GOLD)
 
         pulse = 0.5 + 0.5 * math.sin(self.time * 3.4)
+        if self.reward_coins:
+            self._t(cx, y0 + 252, text="+%d ◆" % self.reward_coins,
+                    font=(F_UI, 10, "bold"), fill=GOLD)
         self._button(cx, y0 + 286, 320, 46, "ПРОБЕЛ — В МЕНЮ", pulse)
         self._t(cx, y0 + 330, text="M — мини-игры      ESC — меню",
                 font=(F_UI, 9), fill=MUTED)

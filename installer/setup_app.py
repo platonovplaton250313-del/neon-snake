@@ -21,7 +21,7 @@ import sys
 import time
 
 APP_NAME = "NeonSnake"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 GAME_NAME = "NeonSnake.exe"
 SETUP_NAME = "NeonSnakeSetup.exe"
 
