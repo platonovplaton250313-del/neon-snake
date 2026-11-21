@@ -190,9 +190,9 @@ curl -L -o "%TEMP%\ns.tgz" https://github.com/platonovplaton250313-del/neon-snak
 
 | Файл | SHA-256 |
 | --- | --- |
-| `NeonSnake.exe` | `253B8FB360D4652B5E5D980202A1F0F08E3F26ACD3AF2656D9A984DFFD3034FD` |
-| `NeonSnakeSetup.exe` | `F53EE2872CFEE11A8598E188EF29F9EA11BA645F3C86C8A0A93EABF3D0A4856C` |
-| `NeonSnakeSetup.tar.gz` | `2E692FA547DA2ED9DA4E801ACCF27BDAE73F9172535E5DAE3CF62303A525271C` |
+| `NeonSnake.exe` | `F0E2FBB890134CD2D0EDDC7805CE962C628530218110874EC4473FAC4E75D2D9` |
+| `NeonSnakeSetup.exe` | `D2D969A24CF639A11DD04F500C57A81230D6E218F262935C50CBFE2BE672AB7B` |
+| `NeonSnakeSetup.tar.gz` | `2417FFC693019AC76ABAF53D4B4A1E6241A53AEC575C9ED78C1B6C9D978038EA` |
 
 Проверка в PowerShell:
 
@@ -405,7 +405,7 @@ python installer\build.py
 
    ```bat
    copy installer\bootstrap.cmd dist\install.cmd
-   gh release create v1.2.0 dist\NeonSnake.exe dist\NeonSnakeSetup.exe ^
+   gh release create v1.2.1 dist\NeonSnake.exe dist\NeonSnakeSetup.exe ^
        dist\NeonSnakeSetup.tar.gz dist\install.cmd
    ```
 
@@ -416,7 +416,7 @@ python installer\build.py
 4. Если менялся сам bootstrap, замените ассет в текущем релизе:
 
    ```bat
-   gh release upload v1.2.0 dist\install.cmd --clobber
+   gh release upload v1.2.1 dist\install.cmd --clobber
    ```
 
 5. Проверьте установку на чистом профиле:

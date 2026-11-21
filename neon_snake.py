@@ -115,15 +115,15 @@ RAINBOW_PALETTES = (
 )
 
 CHEATS = (
-    {"id": "ghost", "name": "ФАНТОМ", "chip": "ФАНТОМ", "price": 2200,
+    {"id": "ghost", "name": "ФАНТОМ", "chip": "ФАНТОМ", "icon": "◈", "price": 2200,
      "desc": "Проходить сквозь стены, метеориты и соперников."},
-    {"id": "x2", "name": "ДВОЙНЫЕ ОЧКИ", "chip": "×2", "price": 2600,
+    {"id": "x2", "name": "ДВОЙНЫЕ ОЧКИ", "chip": "×2", "icon": "×2", "price": 2600,
      "desc": "Все очки удваиваются, включая сетевую игру."},
-    {"id": "revive", "name": "ВТОРОЙ ШАНС", "chip": "ШАНС", "price": 2400,
+    {"id": "revive", "name": "ВТОРОЙ ШАНС", "chip": "ШАНС", "icon": "↺", "price": 2400,
      "desc": "Одно автоматическое возрождение за игру."},
-    {"id": "lucky", "name": "ЗВЕЗДОПАД", "chip": "ЗВЁЗДЫ", "price": 1800,
+    {"id": "lucky", "name": "ЗВЕЗДОПАД", "chip": "ЗВЁЗДЫ", "icon": "★", "price": 1800,
      "desc": "Золотые звёзды появляются заметно чаще."},
-    {"id": "rich", "name": "ЗОЛОТАЯ ЖИЛА", "chip": "+50%", "price": 2000,
+    {"id": "rich", "name": "ЗОЛОТАЯ ЖИЛА", "chip": "+50%", "icon": "◆", "price": 2000,
      "desc": "+50% неонов после каждой игры."},
 )
 CHEAT_BY_ID = {c["id"]: c for c in CHEATS}
@@ -2859,7 +2859,7 @@ class Game:
                 font=(F_UI, 8), fill=MUTED)
 
     def _draw_shop_skins(self, x0, y0, x1):
-        row_h = 38
+        row_h = 40
         top = y0 + 102
         for i, skin in enumerate(SKINS):
             ry0 = top + i * row_h
@@ -2873,13 +2873,13 @@ class Game:
                                    0.55 if selected else 0.12),
                        width=2 if selected else 1)
             head, mid, _tail = skin["colors"]
-            self.rrect(x0 + 38, ry0 + 9, x0 + 56, ry1 - 9, 5,
+            self.rrect(x0 + 38, ry0 + 10, x0 + 56, ry1 - 10, 5,
                        fill=mid, outline=head)
-            self._t(x0 + 68, ry0 + 10, text=skin["name"], anchor="nw",
+            self._t(x0 + 68, ry0 + 6, text=skin["name"], anchor="nw",
                     font=(F_UI, 9, "bold"),
                     fill="#e6fbff" if selected else "#a9c6dd")
-            self._t(x0 + 68, ry0 + 24, text=skin["desc"], anchor="nw",
-                    font=(F_UI, 7), fill="#4f6a8a")
+            self._t(x0 + 68, ry0 + 22, text=skin["desc"], anchor="nw",
+                    font=(F_UI, 8), fill="#62809f")
             if current:
                 state, col = "ВЫБРАН", CYAN
             elif owned:
@@ -2909,14 +2909,14 @@ class Game:
             self.rrect(x0 + 38, ry0 + 10, x0 + 112, ry1 - 10, 7,
                        fill=mix(PANEL_BG, hot, 0.18 if enabled else 0.07),
                        outline=mix("#16304a", hot, 0.45 if enabled else 0.18))
-            self._t(x0 + 75, (ry0 + ry1) / 2, text=cheat["chip"],
-                    font=(F_UI, 8, "bold"),
+            self._t(x0 + 75, (ry0 + ry1) / 2, text=cheat["icon"],
+                    font=(F_TITLE, 12, "bold"),
                     fill=GOLD if enabled else "#8fb2c9")
             self._t(x0 + 124, ry0 + 9, text=cheat["name"], anchor="nw",
                     font=(F_UI, 9, "bold"),
                     fill="#e6fbff" if selected else "#a9c6dd")
             self._t(x0 + 124, ry0 + 24, text=cheat["desc"], anchor="nw",
-                    font=(F_UI, 7), fill="#4f6a8a")
+                    font=(F_UI, 7), fill="#5d7fa3")
             if not owned:
                 if self.eco["coins"] >= cheat["price"]:
                     state, col = "%d ◆" % cheat["price"], GOLD
