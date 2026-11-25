@@ -10,6 +10,7 @@ dist/
 neon_snake_save.json
 neon_snake_best.json
 neon_snake_error.log
+neon_brawl_save.json
 
 # OS
 Thumbs.db
