@@ -9,13 +9,20 @@
 
 ## Запуск
 
-Дважды кликните `play_brawl.bat` или выполните в папке игры:
+Проект лежит в папке `neon-brawl/`. Дважды кликните `play_brawl.bat` или
+выполните из корня репозитория:
 
 ```bat
-python neon_brawl.py
+python neon-brawl\neon_brawl.py
 ```
 
-Запуск из CMD одной командой:
+Либо откройте CMD в папке `neon-brawl` и выполните:
+
+```bat
+brawl.cmd
+```
+
+Запуск из CMD одной командой (после установки):
 
 ```bat
 brawl            :: игра без лишнего окна консоли
@@ -25,8 +32,8 @@ brawl -check     :: показать команду запуска
 ```
 
 Чтобы команда `brawl` работала в любой папке, один раз запустите
-`install_brawl.cmd` — он добавит папку игры в пользовательский `PATH`.
-Удалить из `PATH` можно через `uninstall_brawl.cmd`.
+`neon-brawl\install_brawl.cmd` — он добавит папку игры в пользовательский
+`PATH`. Удалить из `PATH` можно через `neon-brawl\uninstall_brawl.cmd`.
 
 Нужен Python 3.8+ (игра проверена на Python 3.15) и модуль tkinter,
 который входит в стандартную поставку Python для Windows.
@@ -34,7 +41,7 @@ brawl -check     :: показать команду запуска
 Проверка без открытия окна (симуляция двух матчей):
 
 ```bat
-python neon_brawl.py --smoke
+python neon-brawl\neon_brawl.py --smoke
 ```
 
 ## Управление

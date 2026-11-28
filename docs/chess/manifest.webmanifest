@@ -1,0 +1,34 @@
+{
+  "id": "./",
+  "name": "CHESS ARENA — шахматы",
+  "short_name": "CHESS ARENA",
+  "description": "Шахматы против Stockfish шести уровней или вдвоём: разбор партий, архив, PGN/FEN, бесконечные задачи и полные правила.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#302e2b",
+  "theme_color": "#302e2b",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

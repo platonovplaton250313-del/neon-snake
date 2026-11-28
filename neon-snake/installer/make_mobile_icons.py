@@ -12,7 +12,8 @@ import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-OUT = os.path.join(ROOT, "docs", "icons")
+REPO = os.path.dirname(ROOT)
+OUT = os.path.join(REPO, "docs", "icons")
 sys.path.insert(0, HERE)
 import make_icon  # noqa: E402
 

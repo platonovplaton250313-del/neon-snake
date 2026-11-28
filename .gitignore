@@ -5,12 +5,21 @@ __pycache__/
 # Build artifacts
 build/
 dist/
+*/build/
+*/dist/
 
 # Local saves, records and logs
 neon_snake_save.json
 neon_snake_best.json
 neon_snake_error.log
 neon_brawl_save.json
+neon-snake/neon_snake_save.json
+neon-snake/neon_snake_best.json
+neon-snake/neon_snake_error.log
+neon-brawl/neon_brawl_save.json
+
+# IDE
+.idea/
 
 # OS
 Thumbs.db

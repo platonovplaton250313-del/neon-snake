@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CHESS ARENA — шахматы против компьютера</title>
+<meta name="description" content="Шахматы в стиле Chess.com: игра против Stockfish шести уровней или вдвоём, разбор партий, архив, PGN/FEN, бесконечные задачи и полные правила.">
+<meta name="theme-color" content="#302e2b">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CHESS ARENA">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/chess.css">
+</head>
+<body>
+<svg id="piece-sprite" xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="pc-pawn" viewBox="0 0 45 45">
+    <path d="M22.5 8.2c-3.2 0-5.8 2.6-5.8 5.8 0 1.8.8 3.4 2.1 4.5-2.2 1.4-3.6 3.9-3.6 6.7 0 2.8 1.3 5.2 3.4 6.7l-2.7 5.8c-.8 1.7.5 3.6 2.4 3.6h8.4c1.9 0 3.2-1.9 2.4-3.6l-2.7-5.8c2.1-1.5 3.4-3.9 3.4-6.7 0-2.8-1.4-5.3-3.6-6.7 1.3-1.1 2.1-2.7 2.1-4.5 0-3.2-2.6-5.8-5.8-5.8z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M14.5 39.3h16" fill="none" stroke="var(--stroke)" stroke-width="1.5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="pc-knight" viewBox="0 0 45 45">
+    <path d="M13 39c.3-5.8 2.6-10.6 6.9-14.2l5.4-4.5c1.4-1.2 2.1-2.5 2.1-4.1v-2.4l-3.1 2.2c-1 .7-2.1 1-3.3.8-2.2-.4-3.7-2.3-3.5-4.5.1-1.3.8-2.5 1.8-3.3l4.2-3.3 1.2 2.1c.9-.6 1.9-.9 3-.9 2 0 3.8.7 5.3 2 3.9 3.1 6.1 7.7 6.1 12.7 0 3.4-1 6.5-2.9 9.1l1.6 7.2c.2.9-.5 1.6-1.3 1.6H14.2c-.9 0-1.5-.7-1.2-1.5z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <circle cx="28.1" cy="15.3" r="1.15" fill="var(--stroke)" stroke="none"/>
+    <path d="M12.5 39.2h21.8" fill="none" stroke="var(--stroke)" stroke-width="1.5" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="pc-bishop" viewBox="0 0 45 45">
+    <circle cx="22.5" cy="7.1" r="2.4" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4"/>
+    <path d="M22.5 10.3c-4.2 3.4-7.2 7.4-7.2 11.7 0 3 1.6 5.6 4.1 7l-1.6 3.9h9.4l-1.6-3.9c2.5-1.4 4.1-4 4.1-7 0-4.3-3-8.3-7.2-11.7z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M22.5 16.4v7M19.5 19.4h6" fill="none" stroke="var(--stroke)" stroke-width="1.6" stroke-linecap="round"/>
+    <rect x="14.8" y="31.5" width="15.4" height="3.7" rx="1.2" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4"/>
+    <path d="M10.3 35.2h24.4v5.3H10.3z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="pc-rook" viewBox="0 0 45 45">
+    <path d="M12.2 8h5.2v4.5h4.2V8h5.8v4.5h4.2V8h5.2v10.8H12.2z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M15 18.8h15l2 11.7H13z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <rect x="10.4" y="30.5" width="24.2" height="4.2" rx="1.2" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4"/>
+    <path d="M8.4 35.3h28.2v5.2H8.4z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="pc-queen" viewBox="0 0 45 45">
+    <circle cx="9" cy="12" r="2.5" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.3"/>
+    <circle cx="18" cy="8.6" r="2.5" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.3"/>
+    <circle cx="27" cy="8.6" r="2.5" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.3"/>
+    <circle cx="36" cy="12" r="2.5" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.3"/>
+    <path d="M9 14.3l4.9 12.2h17.2L36 14.3l-7.2 6.4L22.5 9.4l-6.3 11.3z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M14.2 27.2h16.6l2.5 4.4H11.7z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <rect x="10" y="31.6" width="25" height="3.7" rx="1.2" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4"/>
+    <path d="M8.4 35.4h28.2v5.1H8.4z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="pc-king" viewBox="0 0 45 45">
+    <path d="M22.5 4.6v7.2M18.9 8.2h7.2" fill="none" stroke="var(--stroke)" stroke-width="2.8" stroke-linecap="round"/>
+    <path d="M13.6 19.6c0-3.3 2.1-6.2 5.2-7.1l3.7-1.1 3.7 1.1c3.1.9 5.2 3.8 5.2 7.1 0 2.8-1.6 5.3-4 6.5l1.4 3.7H16.2l1.4-3.7c-2.4-1.2-4-3.7-4-6.5z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <path d="M14.2 27.4h16.6l2.4 4.4H11.8z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+    <rect x="10" y="31.8" width="25" height="3.7" rx="1.2" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4"/>
+    <path d="M8.4 35.6h28.2v5H8.4z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.4" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="pc-star" viewBox="0 0 45 45">
+    <path d="M22.5 5.4l5.2 10.5 11.6 1.7-8.4 8.2 2 11.6-10.4-5.5-10.4 5.5 2-11.6-8.4-8.2 11.6-1.7z" fill="var(--fill)" stroke="var(--stroke)" stroke-width="1.5" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<header class="topbar">
+  <a class="brand" href="./" title="CHESS ARENA">
+    <span class="brand-mark"><svg viewBox="0 0 45 45"><use href="#pc-knight"></use></svg></span>
+    <span class="brand-text"><b>CHESS</b><i>ARENA</i></span>
+  </a>
+  <nav class="topnav" aria-label="Разделы">
+    <span class="nav-item active">Играть</span>
+    <button class="nav-item" id="puzzle-nav" type="button">Задачи</button>
+    <button class="nav-item" id="archive-nav" type="button">Архив</button>
+  </nav>
+  <div class="top-actions">
+    <span class="engine-pill" id="engine-pill" data-state="loading" title="Загрузка движка">ДВИЖОК</span>
+    <button class="icon-btn" id="settings-btn" type="button" aria-label="Настройки" title="Настройки">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2zm9 4.5v-1.8l-2.1-.5a7 7 0 0 0-.7-1.6l1.1-1.8-1.3-1.3-1.8 1.1a7 7 0 0 0-1.6-.7L14.1 4h-1.8l-.5 2.1a7 7 0 0 0-1.6.7L8.4 5.7 7.1 7l1.1 1.8a7 7 0 0 0-.7 1.6L5.4 11v1.8l2.1.5c.2.6.4 1.1.7 1.6l-1.1 1.8 1.3 1.3 1.8-1.1c.5.3 1 .5 1.6.7l.5 2.1h1.8l.5-2.1c.6-.2 1.1-.4 1.6-.7l1.8 1.1 1.3-1.3-1.1-1.8c.3-.5.5-1 .7-1.6l2.1-.5z" fill="currentColor"/></svg>
+    </button>
+    <button class="icon-btn" id="sound-btn" type="button" aria-label="Выключить звук" aria-pressed="true">
+      <svg class="icon sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5l4.5 3.8V5.7L7.5 9.5H4z"/><path d="M15.4 8.6a4.6 4.6 0 0 1 0 6.8M18.1 6a8.2 8.2 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg class="icon sound-off hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5l4.5 3.8V5.7L7.5 9.5H4z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <button class="btn btn-primary btn-sm" id="new-game-top" type="button" aria-label="Новая партия"><span class="plus" aria-hidden="true">+</span><span class="btn-label">Новая партия</span></button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="game-col" aria-label="Шахматная доска">
+    <div class="player-bar" id="bar-top" data-color="b"></div>
+    <div class="board-stage">
+      <div class="eval-bar hidden" id="eval-bar" aria-label="Оценка позиции">
+        <div class="eval-fill" id="eval-fill"></div>
+        <span class="eval-label" id="eval-label">0.0</span>
+      </div>
+      <div class="board-shell">
+        <div class="board" id="board">
+          <div class="layer squares" id="squares"></div>
+          <div class="layer pieces" id="pieces"></div>
+          <div class="layer markers" id="markers"></div>
+          <svg class="arrows" id="arrows" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div class="promo hidden" id="promo">
+            <div class="promo-card">
+              <p>Выберите фигуру</p>
+              <div class="promo-pieces" id="promo-pieces"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="player-bar" id="bar-bottom" data-color="w"></div>
+  </section>
+
+  <aside class="side-panel" aria-label="Информация о партии">
+    <div class="side-head">
+      <div>
+        <h2>Партия</h2>
+        <p class="status-line" id="status-line"><span class="status-dot"></span><span id="status-text">Начните игру</span></p>
+      </div>
+      <button class="btn btn-primary" id="new-game-side" type="button">Новая</button>
+    </div>
+
+    <div class="game-tags" id="game-tags"></div>
+
+    <div class="puzzle-panel hidden" id="puzzle-panel">
+      <div class="puzzle-panel-head">
+        <span class="tag" id="puzzle-theme"></span>
+        <span class="tag" id="puzzle-difficulty"></span>
+        <span class="puzzle-progress" id="puzzle-progress"></span>
+      </div>
+      <p class="puzzle-instruction" id="puzzle-instruction">Найдите лучший ход.</p>
+      <p class="puzzle-feedback" id="puzzle-feedback" aria-live="polite"></p>
+      <div class="puzzle-actions">
+        <button class="btn btn-soft" id="puzzle-hint" type="button">Подсказка</button>
+        <button class="btn btn-soft" id="puzzle-retry" type="button">Заново</button>
+        <button class="btn btn-soft" id="puzzle-solution" type="button">Решение</button>
+        <button class="btn btn-soft" id="puzzle-list-btn" type="button">К задачам</button>
+      </div>
+    </div>
+
+    <div class="moves-wrap">
+      <div class="moves" id="moves" role="list" aria-label="История ходов"></div>
+      <div class="moves-empty" id="moves-empty">Ходы появятся здесь</div>
+    </div>
+
+    <div class="review-bar hidden" id="review-bar">
+      <button class="nav-btn" data-nav="first" type="button" aria-label="В начало">«</button>
+      <button class="nav-btn" data-nav="prev" type="button" aria-label="Назад">‹</button>
+      <button class="nav-btn" data-nav="next" type="button" aria-label="Вперёд">›</button>
+      <button class="nav-btn" data-nav="last" type="button" aria-label="В конец">»</button>
+      <button class="live-btn" id="back-to-live" type="button">К партии</button>
+    </div>
+
+    <div class="analysis-panel hidden" id="analysis-panel">
+      <div class="analysis-head">
+        <span class="analysis-title">Разбор партии</span>
+        <span class="analysis-progress" id="analysis-progress"></span>
+      </div>
+      <div class="eval-chart" id="eval-chart" aria-label="График оценки партии"></div>
+      <div class="analysis-summary" id="analysis-summary"></div>
+      <div class="analysis-current" id="analysis-current"></div>
+    </div>
+
+    <div class="panel-actions">
+      <button class="btn btn-soft" id="analyze-btn" type="button"><span class="ico">⌕</span> Разбор партии</button>
+      <button class="btn btn-soft" id="puzzle-btn" type="button"><span class="ico">♞</span> Задачи</button>
+      <button class="btn btn-soft" id="archive-btn" type="button"><span class="ico">▤</span> Архив</button>
+      <button class="btn btn-soft" id="pgn-btn" type="button"><span class="ico">⇩</span> PGN / FEN</button>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-soft" id="undo-btn" type="button"><span class="ico">↶</span> Взять назад</button>
+      <button class="btn btn-soft" id="flip-btn" type="button"><span class="ico">⇅</span> Перевернуть</button>
+      <button class="btn btn-danger-soft" id="resign-btn" type="button"><span class="ico">⚑</span> Сдаться</button>
+    </div>
+
+    <p class="side-note">Перетаскивайте фигуры или кликайте: фигура → поле. Стрелки ← → листают партию.</p>
+  </aside>
+</main>
+
+<div class="overlay sheet-overlay hidden" id="settings-overlay">
+  <div class="sheet-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="sheet-head">
+      <div>
+        <span class="setup-kicker">CHESS ARENA</span>
+        <h1 id="settings-title">Настройки</h1>
+        <p>Всё применяется сразу и сохраняется на этом устройстве.</p>
+      </div>
+      <button class="sheet-close" id="settings-close" type="button" aria-label="Закрыть настройки">×</button>
+    </div>
+
+    <div class="settings-body">
+      <section class="set-group">
+        <h2>Доска и фигуры</h2>
+        <label class="set-row">
+          <span>Тема доски</span>
+          <select id="set-board-theme">
+            <option value="green">Зелёная</option>
+            <option value="brown">Дерево</option>
+            <option value="blue">Синяя</option>
+            <option value="gray">Серая</option>
+            <option value="dark">Тёмная</option>
+          </select>
+        </label>
+        <label class="set-row">
+          <span>Стиль фигур</span>
+          <select id="set-piece-style">
+            <option value="classic">Классические</option>
+            <option value="flat">Плоские</option>
+            <option value="neo">Нео</option>
+          </select>
+        </label>
+        <label class="set-range">
+          <span>Размер фигур <output id="out-piece-scale">96%</output></span>
+          <input type="range" id="set-piece-scale" min="70" max="100" step="1" value="96">
+        </label>
+        <label class="set-check"><input type="checkbox" id="set-coordinates" checked><span>Координаты на доске</span></label>
+        <label class="set-check"><input type="checkbox" id="set-show-legal" checked><span>Показывать допустимые ходы</span></label>
+        <label class="set-check"><input type="checkbox" id="set-show-last" checked><span>Подсвечивать последний ход</span></label>
+      </section>
+
+      <section class="set-group">
+        <h2>Анимации и звук</h2>
+        <label class="set-check"><input type="checkbox" id="set-animations" checked><span>Анимация ходов</span></label>
+        <label class="set-range">
+          <span>Скорость анимации <output id="out-animation">180 мс</output></span>
+          <input type="range" id="set-animation" min="0" max="500" step="20" value="180">
+        </label>
+        <label class="set-check"><input type="checkbox" id="set-sound" checked><span>Звуки ходов</span></label>
+        <label class="set-range">
+          <span>Громкость <output id="out-volume">70%</output></span>
+          <input type="range" id="set-volume" min="0" max="100" step="5" value="70">
+        </label>
+      </section>
+
+      <section class="set-group">
+        <h2>Игра</h2>
+        <label class="set-check"><input type="checkbox" id="set-auto-promote"><span>Автоматически превращать в ферзя</span></label>
+        <label class="set-check"><input type="checkbox" id="set-confirm-resign" checked><span>Спрашивать подтверждение при сдаче</span></label>
+        <label class="set-check"><input type="checkbox" id="set-eval-bar" checked><span>Шкала оценки после разбора</span></label>
+        <label class="set-check"><input type="checkbox" id="set-best-move" checked><span>Показывать лучший ход стрелкой</span></label>
+      </section>
+
+      <section class="set-group">
+        <h2>Движок и разбор</h2>
+        <label class="set-range">
+          <span>Глубина разбора <output id="out-analysis-depth">до 12</output></span>
+          <input type="range" id="set-analysis-depth" min="6" max="20" step="1" value="12">
+        </label>
+        <label class="set-range">
+          <span>Время на позицию <output id="out-analysis-time">350 мс</output></span>
+          <input type="range" id="set-analysis-time" min="120" max="2000" step="20" value="350">
+        </label>
+        <p class="set-note">Уровень «Своя» играет в выбранном диапазоне силы.</p>
+        <label class="set-range">
+          <span>Сила бота от <output id="out-bot-range">800–2400</output></span>
+          <input type="range" id="set-bot-min" min="600" max="2800" step="50" value="800" aria-label="Минимальный рейтинг бота">
+        </label>
+        <label class="set-range">
+          <span>до</span>
+          <input type="range" id="set-bot-max" min="600" max="2800" step="50" value="2400" aria-label="Максимальный рейтинг бота">
+        </label>
+      </section>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-soft" id="settings-reset" type="button">Сбросить</button>
+      <button class="btn btn-primary" id="settings-done" type="button">Готово</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay sheet-overlay hidden" id="archive-overlay">
+  <div class="sheet-card archive-card" role="dialog" aria-modal="true" aria-labelledby="archive-title">
+    <div class="sheet-head">
+      <div>
+        <span class="setup-kicker">CHESS ARENA</span>
+        <h1 id="archive-title">Архив партий</h1>
+        <p>Последние 40 партий сохраняются в браузере. Откройте любую для просмотра и разбора.</p>
+      </div>
+      <button class="sheet-close" id="archive-close" type="button" aria-label="Закрыть архив">×</button>
+    </div>
+    <div class="archive-list" id="archive-list"></div>
+  </div>
+</div>
+
+<div class="overlay sheet-overlay hidden" id="pgn-overlay">
+  <div class="sheet-card pgn-card" role="dialog" aria-modal="true" aria-labelledby="pgn-title">
+    <div class="sheet-head">
+      <div>
+        <span class="setup-kicker">CHESS ARENA</span>
+        <h1 id="pgn-title">PGN и FEN</h1>
+        <p>Скопируйте партию, скачайте файл или загрузите свою позицию для разбора.</p>
+      </div>
+      <button class="sheet-close" id="pgn-close" type="button" aria-label="Закрыть PGN">×</button>
+    </div>
+    <label class="pgn-label" for="pgn-text">PGN партии</label>
+    <textarea id="pgn-text" spellcheck="false" placeholder="Вставьте PGN, например: 1. e4 e5 2. Nf3 Nc6 ..."></textarea>
+    <div class="pgn-actions">
+      <button class="btn btn-soft" id="pgn-copy" type="button">Копировать PGN</button>
+      <button class="btn btn-soft" id="pgn-download" type="button">Скачать .pgn</button>
+      <button class="btn btn-primary" id="pgn-load" type="button">Загрузить PGN</button>
+    </div>
+    <label class="pgn-label" for="pgn-fen">FEN позиции</label>
+    <input class="pgn-fen" id="pgn-fen" type="text" spellcheck="false" autocomplete="off" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">
+    <div class="pgn-actions">
+      <button class="btn btn-soft" id="pgn-fen-copy" type="button">Копировать FEN</button>
+      <button class="btn btn-primary" id="pgn-fen-load" type="button">Загрузить FEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay setup-overlay" id="setup-overlay">
+  <div class="setup-card" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="setup-top">
+      <span class="setup-kicker">CHESS ARENA</span>
+      <h1 id="setup-title">Играйте в шахматы</h1>
+      <p>Против компьютера или с другом на одном устройстве. Полные правила, часы и история ходов.</p>
+    </div>
+
+    <div class="segmented" id="mode-segment" role="group" aria-label="Режим игры">
+      <button type="button" data-mode="bot" class="active">С компьютером</button>
+      <button type="button" data-mode="local">Два игрока</button>
+    </div>
+
+    <section class="setup-section" id="bot-section">
+      <h2>Уровень соперника</h2>
+      <div class="levels" id="levels"></div>
+    </section>
+
+    <section class="setup-section">
+      <h2>Контроль времени</h2>
+      <div class="time-chips" id="time-chips">
+        <button type="button" data-time="10+0" class="active"><b>10 мин</b><small>10 + 0</small></button>
+        <button type="button" data-time="5+3"><b>5 мин</b><small>5 + 3</small></button>
+        <button type="button" data-time="3+2"><b>3 мин</b><small>3 + 2</small></button>
+        <button type="button" data-time="1+0"><b>1 мин</b><small>Блиц</small></button>
+        <button type="button" data-time="none"><b>∞</b><small>Без часов</small></button>
+      </div>
+    </section>
+
+    <section class="setup-section" id="color-section">
+      <h2>Ваш цвет</h2>
+      <div class="color-chips" id="color-chips">
+        <button type="button" data-color="w" class="active"><svg class="chip-icon" viewBox="0 0 45 45"><use href="#pc-king"></use></svg>Белые</button>
+        <button type="button" data-color="random"><span class="dice">?</span>Случайно</button>
+        <button type="button" data-color="b"><svg class="chip-icon black" viewBox="0 0 45 45"><use href="#pc-king"></use></svg>Чёрные</button>
+      </div>
+    </section>
+
+    <button class="start-btn" id="start-btn" type="button">Начать игру</button>
+    <button class="setup-cancel hidden" id="setup-cancel" type="button">Вернуться к партии</button>
+    <p class="setup-hint">Подсказка: фигуру можно перетащить или выбрать кликом. Работает и на телефоне.</p>
+    <button class="setup-settings" type="button" data-open-settings><span aria-hidden="true">⚙</span> Настройки доски, звука и движка</button>
+  </div>
+</div>
+
+<div class="overlay result-overlay hidden" id="result-overlay">
+  <div class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div class="result-emblem" id="result-emblem">
+      <svg viewBox="0 0 45 45"><use href="#pc-queen"></use></svg>
+    </div>
+    <p class="result-eyebrow" id="result-eyebrow">Партия завершена</p>
+    <h2 id="result-title">Мат!</h2>
+    <p class="result-sub" id="result-sub"></p>
+    <div class="result-score" id="result-score">1 – 0</div>
+    <div class="result-actions">
+      <button class="btn btn-primary" id="rematch-btn" type="button">Ещё раз</button>
+      <button class="btn btn-soft" id="result-new-btn" type="button">Новая партия</button>
+      <button class="btn btn-soft result-analyze" id="analyze-result-btn" type="button"><span class="ico">⌕</span> Разбор партии</button>
+    </div>
+    <button class="result-close" id="result-close" type="button">Смотреть доску</button>
+  </div>
+</div>
+
+<div class="overlay puzzle-overlay hidden" id="puzzle-overlay">
+  <div class="puzzle-card" role="dialog" aria-modal="true" aria-labelledby="puzzle-list-title">
+    <div class="puzzle-top">
+      <div>
+        <span class="setup-kicker">ТАКТИКА</span>
+        <h1 id="puzzle-list-title">Задачи</h1>
+        <p>Решите тактическую позицию. Ходы проверяются по правилам, а соперник отвечает сам.</p>
+      </div>
+      <button class="puzzle-close" id="puzzle-close" type="button" aria-label="Закрыть задачи">×</button>
+    </div>
+    <div class="endless-levels" id="endless-levels">
+      <button class="endless-card" type="button" data-endless="1">
+        <span class="endless-stars">★☆☆</span>
+        <span class="endless-name">Новичок</span>
+        <span class="endless-desc">Мат в 1 и простые удары</span>
+        <span class="endless-count" id="endless-count-1">Решено: 0</span>
+      </button>
+      <button class="endless-card" type="button" data-endless="2">
+        <span class="endless-stars">★★☆</span>
+        <span class="endless-name">Средний</span>
+        <span class="endless-desc">Вилки и выигрыш ферзя</span>
+        <span class="endless-count" id="endless-count-2">Решено: 0</span>
+      </button>
+      <button class="endless-card" type="button" data-endless="3">
+        <span class="endless-stars">★★★</span>
+        <span class="endless-name">Сложный</span>
+        <span class="endless-desc">Жертвы и форсированные маты</span>
+        <span class="endless-count" id="endless-count-3">Решено: 0</span>
+      </button>
+      <button class="endless-card expert" type="button" data-endless="4">
+        <span class="endless-stars">★★★★</span>
+        <span class="endless-name">Эксперт</span>
+        <span class="endless-desc">Мат в два хода без подсказок</span>
+        <span class="endless-count" id="endless-count-4">Решено: 0</span>
+      </button>
+    </div>
+    <button class="start-btn puzzle-random" id="random-puzzle" type="button">Случайная задача</button>
+    <p class="endless-note">Задачи создаются бесконечно и проверяются движком. Каждая новая позиция отличается от предыдущей.</p>
+
+    <h2 class="puzzle-section-title">Классические задачи</h2>
+    <div class="puzzle-filters" id="puzzle-filters" role="group" aria-label="Сложность задач">
+      <button type="button" data-filter="all" class="active">Все</button>
+      <button type="button" data-filter="1">Новичок</button>
+      <button type="button" data-filter="2">Средний</button>
+      <button type="button" data-filter="3">Сложный</button>
+      <button type="button" data-filter="4">Эксперт</button>
+    </div>
+    <div class="puzzle-grid" id="puzzle-grid"></div>
+    <p class="puzzle-count" id="puzzle-count"></p>
+  </div>
+</div>
+
+<div class="overlay success-overlay hidden" id="puzzle-success">
+  <div class="result-card win" role="dialog" aria-modal="true" aria-labelledby="puzzle-success-title">
+    <div class="result-emblem">
+      <svg viewBox="0 0 45 45"><use href="#pc-queen"></use></svg>
+    </div>
+    <p class="result-eyebrow">Задача решена</p>
+    <h2 id="puzzle-success-title">Отлично!</h2>
+    <p class="result-sub" id="puzzle-success-sub"></p>
+    <div class="result-score" id="puzzle-success-score">Тактика</div>
+    <div class="result-actions">
+      <button class="btn btn-primary" id="puzzle-next" type="button">Следующая</button>
+      <button class="btn btn-soft" id="puzzle-all" type="button">Все задачи</button>
+    </div>
+    <button class="result-close" id="puzzle-success-close" type="button">Вернуться к доске</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/engine.js"></script>
+<script src="js/puzzles.js"></script>
+<script src="js/puzzle-generator.js"></script>
+<script src="js/stockfish-client.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
