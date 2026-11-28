@@ -190,9 +190,10 @@ curl -L -o "%TEMP%\ns.tgz" https://github.com/platonovplaton250313-del/neon-snak
 
 | Файл | SHA-256 |
 | --- | --- |
-| `NeonSnake.exe` | `F0E2FBB890134CD2D0EDDC7805CE962C628530218110874EC4473FAC4E75D2D9` |
-| `NeonSnakeSetup.exe` | `D2D969A24CF639A11DD04F500C57A81230D6E218F262935C50CBFE2BE672AB7B` |
-| `NeonSnakeSetup.tar.gz` | `2417FFC693019AC76ABAF53D4B4A1E6241A53AEC575C9ED78C1B6C9D978038EA` |
+| `NeonSnake.exe` | `629B8F9B2F380483BA7963FF0A4CAEC4A616E5BF31640C87479C5E8111EEFC5E` |
+| `NeonSnakeSetup.exe` | `046D2AC0411620E22D1FE8CB3DE44D1F5E5F8FC02E1CEBEFB7D8B5513DC5017C` |
+| `NeonSnakeSetup.tar.gz` | `F6CE4F39B583751C89FD75D0EE252264C721A8D667E98FDDC105CDFBF0FA1002` |
+| `install.cmd` | `2F80AC7C387C729E7E0A07F6DC276C42A0E64C57C4C95B55FB65B5AC8B93F8B4` |
 
 Проверка в PowerShell:
 
@@ -403,12 +404,13 @@ python neon-snake\installer\build.py
    tar -czf neon-snake\dist\NeonSnakeSetup.tar.gz -C neon-snake\dist NeonSnakeSetup.exe
    ```
 
-3. Обновите `neon-snake\dist\install.cmd` из `neon-snake\installer\bootstrap.cmd`
-   и создайте релиз на GitHub с четырьмя файлами:
+3. Подставьте SHA-256 архива в `set "EXPECT_SHA=..."` в
+   `neon-snake\installer\bootstrap.cmd`, обновите `neon-snake\dist\install.cmd`
+   из `bootstrap.cmd` и создайте релиз на GitHub с четырьмя файлами:
 
    ```bat
    copy neon-snake\installer\bootstrap.cmd neon-snake\dist\install.cmd
-   gh release create v1.2.1 neon-snake\dist\NeonSnake.exe ^
+   gh release create v1.2.2 neon-snake\dist\NeonSnake.exe ^
        neon-snake\dist\NeonSnakeSetup.exe ^
        neon-snake\dist\NeonSnakeSetup.tar.gz neon-snake\dist\install.cmd
    ```
@@ -420,7 +422,7 @@ python neon-snake\installer\build.py
 4. Если менялся сам bootstrap, замените ассет в текущем релизе:
 
    ```bat
-   gh release upload v1.2.1 neon-snake\dist\install.cmd --clobber
+   gh release upload v1.2.2 neon-snake\dist\install.cmd --clobber
    ```
 
 5. Проверьте установку на чистом профиле:

@@ -228,7 +228,10 @@ def rr_pts(x0, y0, x1, y1, r, steps=4):
 
 
 def valid_skin_id(value):
-    return value if value in SKIN_BY_ID else "classic"
+    try:
+        return value if value in SKIN_BY_ID else "classic"
+    except TypeError:
+        return "classic"
 
 
 def default_cheat_flags():
@@ -239,8 +242,45 @@ def valid_cheat_ids(values):
     out = []
     if isinstance(values, list):
         for value in values:
-            if value in CHEAT_BY_ID and value not in out:
+            try:
+                valid = value in CHEAT_BY_ID
+            except TypeError:
+                valid = False
+            if valid and value not in out:
                 out.append(value)
+    return out
+
+
+def valid_dir(value, default=(1, 0)):
+    try:
+        if isinstance(value, (list, tuple)) and len(value) == 2:
+            dx, dy = int(value[0]), int(value[1])
+            if (dx, dy) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                return (dx, dy)
+    except (TypeError, ValueError):
+        pass
+    return default
+
+
+def safe_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_cells(values):
+    out = []
+    if isinstance(values, (list, tuple)):
+        for cell in values:
+            try:
+                if len(cell) != 2:
+                    continue
+                x, y = int(cell[0]), int(cell[1])
+            except (TypeError, ValueError):
+                continue
+            if 0 <= x < COLS and 0 <= y < ROWS:
+                out.append((x, y))
     return out
 
 
@@ -875,8 +915,8 @@ class Game:
             my_winner = 2 if self.net_role == "client" else 1
             if self.net_winner == my_winner:
                 net_bonus += 30
-        total = max(1, int(round(
-            (base + record_bonus + net_bonus) * self.coin_mult)))
+        raw_total = (base + record_bonus + net_bonus) * self.coin_mult
+        total = max(1, int(math.floor(raw_total + 0.5)))
         self.reward_coins = total
         self.reward_record_bonus = record_bonus
         self.eco["coins"] += total
@@ -1017,10 +1057,10 @@ class Game:
         port = self.net_port
         try:
             self.net_server = NetServer(port)
-        except OSError:
+        except (OSError, OverflowError, ValueError):
             try:
                 self.net_server = NetServer(0)
-            except OSError as exc:
+            except (OSError, OverflowError, ValueError) as exc:
                 self.net_status = "ПОРТ ЗАНЯТ: %s" % exc
                 return
         self.net_port = self.net_server.port
@@ -1044,6 +1084,8 @@ class Game:
             host, tail = value.rsplit(":", 1)
             try:
                 port = int(tail)
+                if not 1 <= port <= 65535:
+                    port = NET_PORT
             except ValueError:
                 port = NET_PORT
         self.net_ip = host or "127.0.0.1"
@@ -1296,11 +1338,11 @@ class Game:
         if not rival["alive"]:
             return
         if self.mode == "net" and rival.get("revives", 0) > 0:
-            rival["revives"] -= 1
             old_body = rival["body"]
             rival["alive"] = False
             rival["body"] = []
             if self._respawn_rival(rival):
+                rival["revives"] -= 1
                 x, y = self._center_of(rival["body"][0])
                 self.rings.append(Ring(x, y, GOLD, rmax=52, ttl=0.5))
                 self.floats.append(FloatText(x, y - 14, "ВТОРОЙ ШАНС!", GOLD))
@@ -1571,21 +1613,23 @@ class Game:
         self.net.send(msg)
 
     def _apply_net_state(self, msg):
+        if self.mode != "net" or self.net_role != "client" or self.state == "dead":
+            return
         p2 = msg.get("p2") or {}
-        body = [tuple(c) for c in (p2.get("b") or []) if len(c) == 2]
-        prev = [tuple(c) for c in (p2.get("pv") or []) if len(c) == 2]
+        body = parse_cells(p2.get("b"))
+        prev = parse_cells(p2.get("pv"))
         if body:
             self.snake = body
             self.prev_snake = prev or list(body)
-        self.dir = tuple(p2.get("d") or self.dir)
-        self.score = int(p2.get("s", self.score))
-        self.apples = int(p2.get("a", self.apples))
-        self.stars = int(p2.get("st", self.stars))
-        self.powers = int(p2.get("pw", self.powers))
+        self.dir = valid_dir(p2.get("d"), self.dir)
+        self.score = safe_int(p2.get("s", self.score), self.score)
+        self.apples = safe_int(p2.get("a", self.apples), self.apples)
+        self.stars = safe_int(p2.get("st", self.stars), self.stars)
+        self.powers = safe_int(p2.get("pw", self.powers), self.powers)
 
         p1 = msg.get("p1") or {}
-        host_body = [tuple(c) for c in (p1.get("b") or []) if len(c) == 2]
-        host_prev = [tuple(c) for c in (p1.get("pv") or []) if len(c) == 2]
+        host_body = parse_cells(p1.get("b"))
+        host_prev = parse_cells(p1.get("pv"))
         host_skin = valid_skin_id(p1.get("sk") or "classic")
         host_flags = default_cheat_flags()
         raw_flags = p1.get("ch")
@@ -1602,8 +1646,8 @@ class Game:
         if host_body:
             rival["body"] = host_body
             rival["prev"] = host_prev or list(host_body)
-        rival["dir"] = tuple(p1.get("d") or rival["dir"])
-        rival["score"] = int(p1.get("s", rival["score"]))
+        rival["dir"] = valid_dir(p1.get("d"), rival["dir"])
+        rival["score"] = safe_int(p1.get("s", rival["score"]), rival["score"])
         rival["skin"] = host_skin
         rival["colors"] = host_colors
         rival["cheats"] = host_flags
@@ -1647,12 +1691,16 @@ class Game:
                        "s2": self.rivals[0]["score"] if self.rivals else 0})
 
     def _net_end_client(self, msg):
+        if self.mode != "net" or self.net_role != "client" or self.net_over \
+                or self.state == "dead":
+            return
         self.net_over = True
-        self.net_winner = int(msg.get("winner", 0))
+        self.net_winner = safe_int(msg.get("winner", 0), 0)
         self.net_won = (self.net_winner == 2)
-        self.score = int(msg.get("s2", self.score))
+        self.score = safe_int(msg.get("s2", self.score), self.score)
         if self.rivals:
-            self.rivals[0]["score"] = int(msg.get("s1", self.rivals[0]["score"]))
+            self.rivals[0]["score"] = safe_int(
+                msg.get("s1", self.rivals[0]["score"]), self.rivals[0]["score"])
         self.death_reason = msg.get("reason", "crash")
         self.state = "dead"
         self.dead_at = self.time
@@ -1709,11 +1757,18 @@ class Game:
         dt = min(0.05, started - self.last)
         self.last = started
         try:
+            self._loop_errors = 0
             self.update(dt)
             self.render()
         except tk.TclError:
             self.running = False
             return
+        except Exception:
+            _write_error(traceback.format_exc())
+            self._loop_errors += 1
+            if self._loop_errors >= 5:
+                self.running = False
+                return
         if self.running:
             # целимся в ~60 кадров/с
             spent = (time.perf_counter() - started) * 1000.0
@@ -2025,20 +2080,19 @@ class Game:
     def die(self, reason="crash"):
         if self.state != "playing":
             return
-        if self.revives > 0:
+        if self.revives > 0 and reason != "time" and self._respawn_player():
             self.revives -= 1
-            if self._respawn_player():
-                self.combo = 1
-                self.combo_timer = 0.0
-                self.acc = 0.0
-                self.t_render = 0.0
-                self.queue = []
-                x, y = self._center_of(self.snake[0])
-                self.rings.append(Ring(x, y, GOLD, rmax=60, ttl=0.6))
-                self.floats.append(FloatText(x, y - 18, "ВТОРОЙ ШАНС!", GOLD))
-                self.flash = 0.7
-                self.play_sound("special")
-                return
+            self.combo = 1
+            self.combo_timer = 0.0
+            self.acc = 0.0
+            self.t_render = 0.0
+            self.queue = []
+            x, y = self._center_of(self.snake[0])
+            self.rings.append(Ring(x, y, GOLD, rmax=60, ttl=0.6))
+            self.floats.append(FloatText(x, y - 18, "ВТОРОЙ ШАНС!", GOLD))
+            self.flash = 0.7
+            self.play_sound("special")
+            return
         self.state = "dead"
         self.death_reason = reason
         self.dead_at = self.time

@@ -21,7 +21,7 @@ import sys
 import time
 
 APP_NAME = "NeonSnake"
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 GAME_NAME = "NeonSnake.exe"
 SETUP_NAME = "NeonSnakeSetup.exe"
 
@@ -161,42 +161,71 @@ def _broadcast_change():
         pass
 
 
+def _snake_cmd_mentions(path, marker):
+    candidate = os.path.join(path, "snake.cmd")
+    try:
+        with open(candidate, "r", encoding="ascii", errors="ignore") as fh:
+            return marker in fh.read()
+    except OSError:
+        return False
+
+
+def _is_installed_snake_bin(path):
+    return _snake_cmd_mentions(path, GAME_NAME)
+
+
+def _is_source_snake_bin(path):
+    return _snake_cmd_mentions(path, "neon_snake.py")
+
+
 def path_add():
-    """Ставит папку bin в начало пользовательского PATH (без дублей)."""
+    """Ставит папку bin в начало PATH, убирая старые записи этой игры."""
     if os.environ.get("NEON_SNAKE_NO_PATH") == "1":
         say("  PATH не изменялся (NEON_SNAKE_NO_PATH=1).")
-        return
+        return True
     try:
         value, kind = _read_user_path()
         parts = [p for p in value.split(";") if p.strip()]
         target = _norm_path(BIN_DIR)
-        parts = [p for p in parts if _norm_path(p) != target]
-        new_value = ";".join([BIN_DIR] + parts)
+        kept = []
+        for part in parts:
+            if _norm_path(part) == target:
+                continue
+            if _is_installed_snake_bin(part) or _is_source_snake_bin(part):
+                continue
+            kept.append(part)
+        new_value = ";".join([BIN_DIR] + kept)
         if new_value == value:
             say("  PATH: уже настроен.")
-            return
+            return True
         _write_user_path(new_value, kind)
         _broadcast_change()
         say("  PATH: добавлено " + BIN_DIR)
-    except Exception as exc:  # noqa: BLE001 - установка не должна падать
+        return True
+    except Exception as exc:  # noqa: BLE001 - ошибка PATH не должна ломать установку молча
         say("  ВНИМАНИЕ: не удалось изменить PATH: %s" % exc)
         say("  Запускайте игру по полному пути: " + GAME_EXE)
+        return False
 
 
 def path_remove():
     try:
         value, kind = _read_user_path()
         parts = [p for p in value.split(";") if p.strip()]
-        target = _norm_path(BIN_DIR)
-        kept = [p for p in parts if _norm_path(p) != target]
+        kept = [p for p in parts
+                if _norm_path(p) != _norm_path(BIN_DIR)
+                and not _is_installed_snake_bin(p)
+                and not _is_source_snake_bin(p)]
         if len(kept) != len(parts):
             _write_user_path(";".join(kept), kind)
             _broadcast_change()
-            say("  PATH: удалено " + BIN_DIR)
+            say("  PATH: удалены записи NEON SNAKE")
         else:
             say("  PATH: записи не было.")
+        return True
     except Exception as exc:  # noqa: BLE001
         say("  ВНИМАНИЕ: не удалось изменить PATH: %s" % exc)
+        return False
 
 
 # ---------------------------------------------------------------- ярлыки
@@ -210,6 +239,10 @@ if not exist "%%GAME%%" (
     exit /b 1
 )
 start "" "%%GAME%%" %%*
+if errorlevel 1 (
+    echo [snake] Failed to start the game.
+    exit /b 1
+)
 exit /b 0
 """ % {"setup": SETUP_NAME, "game": GAME_NAME}
 
@@ -221,6 +254,7 @@ if /i "%%~1"=="snake" goto snake
 echo.
 echo   NEON SNAKE maintenance
 echo     install snake            reinstall / repair
+echo     install snake --verify   check file hashes
 echo     install snake --remove   uninstall
 echo.
 exit /b 1
@@ -233,7 +267,12 @@ if not exist "%%SETUP%%" (
 )
 if /i "%%~2"=="--remove" goto remove
 if /i "%%~2"=="remove" goto remove
+if /i "%%~2"=="--verify" goto verify
+if /i "%%~2"=="verify" goto verify
 "%%SETUP%%" --install
+exit /b %%errorlevel%%
+:verify
+"%%SETUP%%" --verify
 exit /b %%errorlevel%%
 :remove
 "%%SETUP%%" --remove
@@ -279,9 +318,20 @@ def import_saves():
 def read_manifest():
     try:
         with open(MANIFEST, "r", encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
         return None
+    except Exception:
+        return {}
+
+
+def manifest_problem(manifest):
+    if manifest is None:
+        return "нет manifest.json"
+    if not isinstance(manifest, dict) or manifest.get("app") != APP_NAME:
+        return "manifest.json повреждён"
+    return None
 
 
 def collect_problems():
@@ -295,11 +345,15 @@ def collect_problems():
     if not os.path.isfile(os.path.join(BIN_DIR, "install.cmd")):
         problems.append("нет команды install.cmd")
     manifest = read_manifest()
-    if not manifest:
-        problems.append("нет manifest.json")
+    bad = manifest_problem(manifest)
+    if bad:
+        problems.append(bad)
         return problems
     for key, path in (("game", GAME_EXE), ("setup", SETUP_EXE)):
         item = manifest.get(key) or {}
+        if not isinstance(item, dict):
+            problems.append("manifest.json повреждён")
+            continue
         if not os.path.isfile(path):
             continue
         try:
@@ -312,15 +366,16 @@ def collect_problems():
     return problems
 
 
-def write_manifest():
+def write_manifest(setup_hash=None, setup_size=None):
     data = {
         "app": APP_NAME,
         "version": VERSION,
         "installed": time.strftime("%Y-%m-%d %H:%M:%S"),
         "game": {"file": GAME_NAME, "size": os.path.getsize(GAME_EXE),
                  "sha256": sha256_file(GAME_EXE)},
-        "setup": {"file": SETUP_NAME, "size": os.path.getsize(SETUP_EXE),
-                  "sha256": sha256_file(SETUP_EXE)},
+        "setup": {"file": SETUP_NAME,
+                  "size": os.path.getsize(SETUP_EXE) if setup_size is None else setup_size,
+                  "sha256": sha256_file(SETUP_EXE) if setup_hash is None else setup_hash},
     }
     tmp = MANIFEST + ".new"
     with open(tmp, "w", encoding="utf-8") as fh:
@@ -367,14 +422,29 @@ def do_install():
     write_text(os.path.join(BIN_DIR, "snake.cmd"), SNAKE_CMD)
     write_text(os.path.join(BIN_DIR, "install.cmd"), INSTALL_CMD)
 
+    old_manifest = read_manifest()
+    setup_hash = None
+    setup_size = None
+    if _running_from_home() and manifest_problem(old_manifest) is None \
+            and old_manifest.get("version") == VERSION:
+        item = old_manifest.get("setup") or {}
+        if isinstance(item.get("sha256"), str) and len(item["sha256"]) == 64:
+            setup_hash = item["sha256"]
+            setup_size = item.get("size")
     try:
-        write_manifest()
+        write_manifest(setup_hash, setup_size)
     except OSError as exc:
         say("ОШИБКА: не удалось записать manifest.json: %s" % exc)
         return 1
 
-    import_saves()
-    path_add()
+    try:
+        import_saves()
+    except Exception as exc:
+        say("  ВНИМАНИЕ: не удалось перенести сохранения: %s" % exc)
+    if not path_add():
+        say("ОШИБКА: не удалось настроить PATH. Запускайте игру по полному пути:")
+        say("  " + GAME_EXE)
+        return 1
 
     problems = collect_problems()
     if problems:
@@ -400,7 +470,10 @@ def do_install():
 def do_verify():
     header("проверка")
     manifest = read_manifest()
-    if manifest:
+    bad = manifest_problem(manifest)
+    if bad:
+        say("  " + bad)
+    else:
         say("  Версия: %s" % manifest.get("version", "?"))
         say("  Установлено: %s" % manifest.get("installed", "?"))
     problems = collect_problems()
@@ -419,7 +492,7 @@ def do_verify():
 
 
 def _safe_home_for_delete():
-    """Рекурсивно удаляем только папку, которая называется NeonSnake."""
+    """Рекурсивно удаляем только папку с ожидаемым именем."""
     try:
         path = os.path.abspath(HOME)
         if os.path.dirname(path) == path:        # корень диска
@@ -429,18 +502,68 @@ def _safe_home_for_delete():
         return False
 
 
+def _install_files():
+    return [os.path.join(BIN_DIR, "snake.cmd"),
+            os.path.join(BIN_DIR, "install.cmd"),
+            MANIFEST, GAME_EXE, SETUP_EXE]
+
+
+def remove_install_files():
+    """Удаляет файлы установки, кроме используемых прямо сейчас."""
+    failed = []
+    running = os.path.abspath(sys.executable)
+    from_home = _running_from_home()
+    for path in _install_files():
+        if _same_file(running, path):
+            continue
+        # install.cmd ещё читается cmd, если установщик запущен через него.
+        if from_home and path == os.path.join(BIN_DIR, "install.cmd"):
+            continue
+        try:
+            _clear_readonly(path)
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            failed.append("%s: %s" % (os.path.basename(path), exc))
+            say("  Не удалось удалить %s: %s" % (path, exc))
+    for folder in (BIN_DIR, HOME):
+        try:
+            os.rmdir(folder)
+        except OSError:
+            pass
+    return failed
+
+
 def _delete_home_later():
-    """Удаляет папку игры после выхода установщика (он сам заблокирован)."""
-    if not _safe_home_for_delete():
-        say("  Папка игры не удалена: небезопасный путь")
-        say("  " + HOME)
+    """Удаляет остатки после выхода установщика (он сам заблокирован)."""
+    if not os.path.isdir(HOME):
         return
-    args = ["cmd", "/c", "ping", "-n", "3", "127.0.0.1", ">nul", "&",
-            "rmdir", "/s", "/q", HOME, ">nul", "2>nul", "&",
-            "ping", "-n", "2", "127.0.0.1", ">nul", "&",
-            "rmdir", "/s", "/q", HOME, ">nul", "2>nul"]
+    quoted_home = '"' + HOME + '"'
+    quoted_setup = '"' + SETUP_EXE + '"'
+    if _safe_home_for_delete():
+        delete_step = ("attrib -r /s /q " + quoted_home + "\\* >nul 2>nul "
+                       "& rmdir /s /q " + quoted_home + " >nul 2>nul")
+    else:
+        quoted_manifest = '"' + MANIFEST + '"'
+        quoted_game = '"' + GAME_EXE + '"'
+        quoted_snake_cmd = '"' + os.path.join(BIN_DIR, "snake.cmd") + '"'
+        quoted_install_cmd = '"' + os.path.join(BIN_DIR, "install.cmd") + '"'
+        quoted_bin = '"' + BIN_DIR + '"'
+        delete_step = ("del /f /q " + quoted_setup + " " + quoted_game + " "
+                       + quoted_manifest + " " + quoted_snake_cmd + " "
+                       + quoted_install_cmd + " >nul 2>nul "
+                       "& rmdir " + quoted_bin + " >nul 2>nul "
+                       "& rmdir " + quoted_home + " >nul 2>nul")
+    steps = []
+    for attempt in range(3):
+        steps.append("ping -n %d 127.0.0.1 >nul" % (3 if attempt == 0 else 2))
+        steps.append(delete_step)
+    command = "cmd /c " + " & ".join(steps)
     try:
-        subprocess.Popen(args, creationflags=DETACHED_PROCESS, close_fds=True,
+        stable_cwd = os.path.dirname(os.path.abspath(HOME)) or os.path.abspath(os.sep)
+        subprocess.Popen(command, creationflags=DETACHED_PROCESS, close_fds=True,
+                         cwd=stable_cwd,
                          stdin=subprocess.DEVNULL,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
@@ -459,43 +582,20 @@ def _running_from_home():
 
 def do_remove():
     header("удаление")
-    path_remove()
-
-    if _running_from_home():
-        # Не трогаем файлы сейчас: cmd ещё читает install.cmd из этой папки.
+    path_ok = path_remove()
+    failed = remove_install_files()
+    if os.path.isdir(HOME):
         _delete_home_later()
         say("  Папка игры будет удалена после закрытия установщика.")
+    if failed or not path_ok:
         say()
-        say("  Игра удалена. Сохранения оставлены в:")
-        say("  " + DATA_DIR)
-        return 0
-
-    for path in (os.path.join(BIN_DIR, "snake.cmd"),
-                 os.path.join(BIN_DIR, "install.cmd"),
-                 MANIFEST, GAME_EXE, SETUP_EXE):
-        try:
-            if _same_file(os.path.abspath(sys.executable), path):
-                continue
-            _clear_readonly(path)
-            os.remove(path)
-        except FileNotFoundError:
-            pass
-        except OSError as exc:
-            say("  Не удалось удалить %s: %s" % (path, exc))
-
-    for folder in (BIN_DIR, HOME):
-        try:
-            os.rmdir(folder)
-        except OSError:
-            pass
-
-    if os.path.isdir(HOME):
-        if _safe_home_for_delete():
-            _delete_home_later()
-            say("  Папка игры будет удалена после закрытия установщика.")
-        else:
-            say("  Остались файлы в папке: " + HOME)
-
+        say("ВНИМАНИЕ: удаление завершено не полностью.")
+        if not path_ok:
+            say("  - не удалось изменить PATH")
+        for item in failed:
+            say("  - " + item)
+        say("  Удалите остатки вручную: " + HOME)
+        return 1
     say()
     say("  Игра удалена. Сохранения оставлены в:")
     say("  " + DATA_DIR)

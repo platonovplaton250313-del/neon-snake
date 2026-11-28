@@ -370,7 +370,11 @@
     fail() {
       if (this.failed) return;
       this.failed = true;
+      const ws = this.ws;
       this.teardown();
+      if (ws) {
+        try { ws.close(); } catch (err) { /* уже закрыт */ }
+      }
       if (this.onclose) this.onclose('failed');
     }
 
@@ -528,15 +532,19 @@
     return flags;
   }
 
+  function hasOwn(map, key) {
+    return Object.prototype.hasOwnProperty.call(map, key);
+  }
+
   function validSkinId(id) {
-    return typeof id === 'string' && !!SKIN_BY_ID[id] ? id : 'classic';
+    return typeof id === 'string' && hasOwn(SKIN_BY_ID, id) ? id : 'classic';
   }
 
   function validCheatIds(list) {
     if (!Array.isArray(list)) return [];
     const out = [];
     for (const id of list) {
-      if (CHEAT_BY_ID[id] && !out.includes(id)) out.push(id);
+      if (typeof id === 'string' && hasOwn(CHEAT_BY_ID, id) && !out.includes(id)) out.push(id);
     }
     return out;
   }
@@ -567,12 +575,12 @@
         if (saved && saved.bests) {
           for (const mode of Object.keys(data.bests)) {
             const value = Number(saved.bests[mode]);
-            if (Number.isFinite(value) && value >= 0) data.bests[mode] = Math.floor(value);
+            if (Number.isFinite(value) && value >= 0) data.bests[mode] = Math.min(1000000000, Math.floor(value));
           }
         }
         if (saved) {
           const coins = Number(saved.coins);
-          if (Number.isFinite(coins) && coins >= 0) data.coins = Math.floor(coins);
+          if (Number.isFinite(coins) && coins >= 0) data.coins = Math.min(1000000000, Math.floor(coins));
           data.skin = validSkinId(saved.skin);
           if (Array.isArray(saved.skins)) {
             for (const id of saved.skins) {
@@ -643,12 +651,13 @@
   }
 
   function equippedSkin() {
-    return SKIN_BY_ID[store.skin] || SKINS[0];
+    return SKIN_BY_ID[validSkinId(store.skin)] || SKINS[0];
   }
 
   function skinColorsAt(skinOrId, time) {
-    const skin = typeof skinOrId === 'string' ? SKIN_BY_ID[skinOrId] : skinOrId;
-    if (!skin) return SKINS[0].colors.slice();
+    const skin = typeof skinOrId === 'string'
+      ? SKIN_BY_ID[validSkinId(skinOrId)] : skinOrId;
+    if (!skin || !Array.isArray(skin.colors)) return SKINS[0].colors.slice();
     if (skin.special === 'rainbow') {
       const index = Math.floor((time || 0) * 1.7) % RAINBOW_PALETTES.length;
       return RAINBOW_PALETTES[index].slice();
@@ -910,6 +919,8 @@
     /* ---------------------------------------------------------- подготовка */
     resetGame(mode) {
       this.mode = mode;
+      this._rivalSig = '';
+      this._fxSig = '';
       const settings = store.settings;
       this.wrap = !!settings.wrap;
       const speed = SPEEDS[settings.speed] || SPEEDS.normal;
@@ -1385,8 +1396,12 @@
     turn(d) {
       if (!d || (d[0] === 0 && d[1] === 0)) return;
       if (this.state !== 'playing' && this.state !== 'countdown') return;
+      if (!this.swipeHintPlayed) {
+        this.swipeHintPlayed = true;
+        const hint = document.getElementById('swipe-hint');
+        if (hint) hint.classList.add('fade');
+      }
       if (this.mode === 'net' && this.netRole === 'guest') {
-        if (this.dir && opposite(d, this.dir)) return;
         this.netSend({ t: 'input', d: [d[0], d[1]] });
         haptic(6);
         return;
@@ -1679,9 +1694,9 @@
 
     die(reason) {
       if (this.state !== 'playing') return;
-      if ((this.revives || 0) > 0 && reason !== 'time') {
+      if ((this.revives || 0) > 0 && reason !== 'time' && this.reviveSnake()) {
         this.revives -= 1;
-        if (this.reviveSnake()) return;
+        return;
       }
       this.state = 'dead';
       this.deathReason = reason || 'crash';
@@ -1710,7 +1725,7 @@
         fx.text(pe.cell, pe.text, pe.tcolor);
       }
       this.pendingEats = [];
-      this.commitBest();
+      if (!(this.mode === 'net' && this.netRole === 'host')) this.commitBest();
       Sfx.play('die');
       haptic([18, 40, 24]);
       if (this.mode === 'net' && this.netRole === 'host') this.endNet(2, reason || 'crash');
@@ -1922,7 +1937,10 @@
       if (this.netJoinAttempts >= 8) {
         ui.setJoinStatus('ХОСТ НЕ ОТВЕЧАЕТ · ПРОВЕРЬТЕ КОД', 'err');
         ui.enableJoin(true);
-        this.closeNet();
+        clearTimeout(this.netJoinTimer);
+        this.netJoinTimer = setTimeout(() => {
+          if (this.netRole === 'guest' && !this.netHostLinked) this.closeNet();
+        }, 3200);
         return;
       }
       clearTimeout(this.netJoinTimer);
@@ -2127,7 +2145,8 @@
       clearTimeout(this.netJoinTimer);
       this.netJoinTimer = 0;
       if (this.netOver && this.netLost) return;
-      const inMatch = this.netActive || this.netHaveState;
+      const inMatch = !this.netOver && this.netHaveState &&
+        (this.state === 'playing' || this.state === 'countdown');
       this.netOver = true;
       this.netLost = true;
       this.netActive = false;
@@ -2236,6 +2255,15 @@
       return [x, y];
     }
 
+    static validDir(d) {
+      if (!Array.isArray(d) || d.length !== 2) return null;
+      const x = Number(d[0]);
+      const y = Number(d[1]);
+      if (!Number.isInteger(x) || !Number.isInteger(y)) return null;
+      if (x < -1 || x > 1 || y < -1 || y > 1 || (x === 0 && y === 0)) return null;
+      return [x, y];
+    }
+
     netHostSend(dt, force) {
       if (this.netRole !== 'host' || !this.netGuestLinked) return;
       if (!this.broker || !this.broker.connected) return;
@@ -2286,7 +2314,7 @@
         this.snake = body;
         this.prevSnake = prev.length ? prev : body.map((c) => c.slice());
       }
-      const d2 = Game.validCell(Array.isArray(p2.d) ? p2.d : null);
+      const d2 = Game.validDir(p2.d);
       if (d2) this.dir = d2;
       this.score = Number.isFinite(Number(p2.s)) ? Number(p2.s) : this.score;
       this.apples = Number.isFinite(Number(p2.a)) ? Number(p2.a) : this.apples;
@@ -2296,7 +2324,7 @@
       const p1 = msg.p1 && typeof msg.p1 === 'object' ? msg.p1 : {};
       const hostBody = Game.parseCells(p1.b);
       const hostPrev = Game.parseCells(p1.pv);
-      const hostSkin = SKIN_BY_ID[this.netHostSkin] || SKINS[0];
+      const hostSkin = SKIN_BY_ID[validSkinId(this.netHostSkin)] || SKINS[0];
       if (!this.rivals.length) {
         this.rivals = [this.makeRival('ХОСТ', skinColorsAt(hostSkin, this.time), hostBody, [1, 0])];
         this.rivals[0].ai = false;
@@ -2308,7 +2336,7 @@
         rival.body = hostBody;
         rival.prev = hostPrev.length ? hostPrev : hostBody.map((c) => c.slice());
       }
-      const d1 = Game.validCell(Array.isArray(p1.d) ? p1.d : null);
+      const d1 = Game.validDir(p1.d);
       if (d1) rival.dir = d1;
       rival.score = Number.isFinite(Number(p1.s)) ? Number(p1.s) : rival.score;
       rival.apples = Number.isFinite(Number(p1.a)) ? Number(p1.a) : rival.apples;
@@ -2336,6 +2364,11 @@
       if (Number.isFinite(iv) && iv > 0.03) this.netInterval = clamp(iv, 0.05, 0.4);
       const cd = Number(msg.cd);
       this.netCountdown = Number.isFinite(cd) ? Math.max(0, cd) : 0;
+      const eff = msg.eff && typeof msg.eff === 'object' ? msg.eff : {};
+      for (const key of Object.keys(this.effects)) {
+        const value = Number(eff[key]);
+        this.effects[key] = Number.isFinite(value) ? clamp(value, 0, 30) : 0;
+      }
       this.netHaveState = true;
       this.tRender = 0;
       this.updateHud();
@@ -2982,13 +3015,10 @@
 
     updateFxChips() {
       const box = $('#fx-chips');
-      const showEffects = this.mode !== 'net' || this.netRole !== 'guest';
       const active = [];
-      if (showEffects) {
-        for (const key of Object.keys(EFFECT_INFO)) {
-          const value = this.effects[key] || 0;
-          if (value > 0) active.push({ key, value, info: EFFECT_INFO[key] });
-        }
+      for (const key of Object.keys(EFFECT_INFO)) {
+        const value = this.effects[key] || 0;
+        if (value > 0) active.push({ key, value, info: EFFECT_INFO[key] });
       }
       for (const cheat of CHEATS) {
         if (this.cheats && this.cheats[cheat.id]) {
@@ -4050,6 +4080,14 @@
     }
     requestAnimationFrame(loop);
   }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== STORAGE_KEY || !event.newValue) return;
+    Object.assign(store, loadStore());
+    game.refreshBests();
+    ui.refreshWallet();
+    if (ui.screen === 'shop') ui.renderShop();
+  });
 
   game.refreshBests();
   renderSettings();

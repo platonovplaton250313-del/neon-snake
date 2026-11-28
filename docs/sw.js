@@ -1,5 +1,5 @@
 /* NEON SNAKE + CHESS ARENA — офлайн-кэш PWA. */
-const CACHE = 'neon-snake-v10';
+const CACHE = 'neon-snake-v11';
 const ASSETS = [
   './',
   './index.html',
